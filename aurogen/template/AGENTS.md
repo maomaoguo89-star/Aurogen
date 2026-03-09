@@ -30,11 +30,7 @@ You wake up fresh each session. Files are your continuity:
 
 ## Scheduled Reminders
 
-When the user asks for a reminder at a specific time, use `exec` to run:
-```
-aurogen cron add --name "reminder" --message "Your message" --at "YYYY-MM-DDTHH:MM:SS" --deliver --to "USER_ID" --channel "CHANNEL"
-```
-Get USER_ID and CHANNEL from the runtime context (e.g., `8281248569` and `telegram` from `telegram:8281248569`).
+Use the `cron` tool directly (not `exec`) to set reminders. Refer to the cron skill (`SKILL.md`) for syntax.
 
 **Do NOT just write reminders to MEMORY.md** — that won't trigger actual notifications.
 

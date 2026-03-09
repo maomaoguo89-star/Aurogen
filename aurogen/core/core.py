@@ -12,7 +12,7 @@ from core.memory import MemoryStore
 from core.tools.cron import CronTool
 from core.tools.mcp import connect_mcp_servers
 from core.tools.web import WebFetchTool, WebSearchTool
-from cron import CronService
+from cron import CronJob, CronService
 from message.queue_manager import get_inbound_queue
 from message.session_manager import Session
 from message.events import InboundMessage, EventType, AgentEvent
@@ -51,11 +51,31 @@ class AgentLoop:
         self.tools = ToolRegistry()
         self.workspace = Path(workspace).resolve()
         self.restrict_to_workspace = False
-        self.cron_service = CronService(self.workspace / "cron" / "jobs.json")
+        self.cron_service = CronService(
+            self.workspace / "cron" / "jobs.json",
+            on_job=self._handle_cron_job,
+        )
         self._mcp_stack: AsyncExitStack | None = None
         self._register_default_tools()
         self.subagent_manager = SubagentManager(provider=self.provider, workspace=self.workspace)
         self.tools.register(SpawnTool(self.subagent_manager))
+
+    async def _handle_cron_job(self, job: CronJob) -> str | None:
+        """Cron 任务回调：将消息注入入站队列，由 agent 正常处理并回复。"""
+        payload = job.payload
+        if not payload.channel or not payload.to:
+            print(f"[Cron] 任务 '{job.name}' 缺少 channel/to，跳过投递")
+            return None
+
+        session_id = f"{payload.channel}@{payload.to}"
+        msg = InboundMessage(
+            session_id=session_id,
+            content=payload.message,
+            metadata={"source": "cron", "job_id": job.id},
+        )
+        await get_inbound_queue().put(msg)
+        print(f"[Cron] 任务 '{job.name}' 已投递到 {session_id}")
+        return "delivered"
 
     def _register_default_tools(self) -> None:
         """注册工具"""
