@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/banner.png" alt="Aurogen" width="200">
+  <img src="./assets/banner.png" alt="Aurogen" width="600">
   <h2>Aurogen: More OpenClaws</h1>
 </div>
 
