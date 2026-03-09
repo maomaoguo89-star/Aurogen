@@ -16,8 +16,8 @@
             "type": "openai_custom",
             "description": "openai compatible custom provider",
             "settings": {
-                "api_key": "sk-cYwysSpzMFvt7sP8Eb90B07f2fF943Cc8dD5E41a838d17B7",
-                "api_base": "https://aihubmix.com/v1"
+                "api_key": "sk-xxx",
+                "api_base": "https://api.openai.com/v1"
             }
         }
     },
