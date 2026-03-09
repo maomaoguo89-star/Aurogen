@@ -1,0 +1,41 @@
+# Web framework & server
+fastapi>=0.135.1
+uvicorn>=0.41.0
+python-multipart>=0.0.22
+
+# Data validation
+pydantic>=2.12.4
+
+# LLM provider (OpenAI-compatible client for Claude, Gemini, etc.)
+openai>=2.26.0
+
+# HTTP client
+httpx>=0.28.0
+
+# Logging
+loguru>=0.7.3
+
+# Optional: Feishu/Lark channel integration
+lark-oapi>=1.5.3
+
+# Optional: QQ channel integration
+qq-botpy
+
+# Optional: DingTalk channel integration
+dingtalk-stream
+
+# Optional: Discord / WhatsApp channel integration
+websockets
+
+# Optional: Mochat channel integration
+python-socketio[asyncio_client]
+
+# Optional: Slack channel integration
+slack-sdk
+slackify-markdown
+
+# Optional: Telegram channel integration
+python-telegram-bot[httpx]
+
+# Optional: Model Context Protocol (MCP) tool integration
+mcp>=1.26.0

@@ -1,0 +1,8 @@
+aurogen_web/node_modules
+aurogen_web/dist
+aurogen/__pycache__
+aurogen/**/__pycache__
+aurogen/**/*.pyc
+aurogen/**/*.pyo
+aurogen/.workspace
+**/.DS_Store
