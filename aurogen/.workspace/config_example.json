@@ -31,7 +31,7 @@
     },
     "mcp": {},
     "auth": {
-        "password": "pwd",
+        "password": "",
         "first_login": true
     },
     "heartbeat": {
