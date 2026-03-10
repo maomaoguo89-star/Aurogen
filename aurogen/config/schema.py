@@ -4,23 +4,21 @@ from typing import Any, Dict, Literal
 ThinkingLevel = Literal["none", "low", "medium", "high"]
 
 
-class ModelSettings(BaseModel):
-    model: str
-    provider: str
-    memory_window: int = 100
-    thinking: ThinkingLevel = "none"
-
-
 class AgentConfig(BaseModel):
     name: str
     description: str
-    model_settings: ModelSettings
+    provider: str
+    emoji: str = ""
 
 
 class ProviderConfig(BaseModel):
     type: str
     description: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
+    model: str = ""
+    memory_window: int = 100
+    thinking: ThinkingLevel = "none"
+    emoji: str = ""
 
 
 class ChannelConfig(BaseModel):
@@ -28,6 +26,7 @@ class ChannelConfig(BaseModel):
     agent_name: str
     description: str = ""
     settings: dict = {}         # channel 类型专属配置（凭证等），schema 不感知细节
+    emoji: str = ""
 
 
 class MCPServerConfig(BaseModel):

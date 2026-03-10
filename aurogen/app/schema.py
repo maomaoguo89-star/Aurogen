@@ -32,25 +32,26 @@ class AddChannelRequest(BaseModel):
     agent_name: str
     description: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
+    emoji: str = ""
 
 
 class AddAgentRequest(BaseModel):
     name: str           # agent key，也是 workspace 目录名，如 "assistant"
     display_name: str   # 显示名，对应 AgentConfig.name
     description: str = ""
-    model: str
     provider: str
-    memory_window: int = 100
-    thinking: ThinkingLevel = "none"
+    emoji: str = ""
 
 
 class UpdateAgentRequest(BaseModel):
     display_name: Optional[str] = None
     description: Optional[str] = None
-    model: Optional[str] = None
     provider: Optional[str] = None
-    memory_window: Optional[int] = None
-    thinking: Optional[ThinkingLevel] = None
+    emoji: Optional[str] = None
+
+
+class WriteFileRequest(BaseModel):
+    content: str
 
 
 class AddProviderRequest(BaseModel):
@@ -58,18 +59,27 @@ class AddProviderRequest(BaseModel):
     type: str
     description: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
+    model: str = ""
+    memory_window: int = 100
+    thinking: ThinkingLevel = "none"
+    emoji: str = ""
 
 
 class UpdateProviderRequest(BaseModel):
     type: Optional[str] = None
     description: Optional[str] = None
     settings: Optional[dict[str, Any]] = None
+    model: Optional[str] = None
+    memory_window: Optional[int] = None
+    thinking: Optional[ThinkingLevel] = None
+    emoji: Optional[str] = None
 
 
 class UpdateChannelRequest(BaseModel):
     agent_name: Optional[str] = None
     description: Optional[str] = None
     settings: Optional[dict[str, Any]] = None
+    emoji: Optional[str] = None
 
 
 class CreateChatSessionRequest(BaseModel):

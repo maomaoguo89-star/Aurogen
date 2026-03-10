@@ -72,11 +72,10 @@ class Provider:
         tools: list[dict] | None = None,
         agent_name: str = "main",
     ) -> Any:
-        ms = config_manager.get(f"agents.{agent_name}.model_settings", {})
-        provider_key = ms.get("provider", "openai")
-        model = ms.get("model", "gpt-4o")
-        thinking = ms.get("thinking", "none")
+        provider_key = config_manager.get(f"agents.{agent_name}.provider", "openai")
         provider_cfg = config_manager.get(f"providers.{provider_key}", {})
+        model = provider_cfg.get("model", "gpt-4o")
+        thinking = provider_cfg.get("thinking", "none")
 
         registry = _build_provider_registry()
         provider_type = provider_cfg.get("type", provider_key)

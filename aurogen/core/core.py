@@ -300,7 +300,8 @@ class AgentLoop:
             print(f"[AgentLoop] 消息处理完成: {final_content[:50]}...")
 
             # 自动触发记忆整合检查
-            memory_window = config_manager.get("agents." + agent_name + ".model_settings.memory_window", 100)
+            provider_key = config_manager.get("agents." + agent_name + ".provider", "")
+            memory_window = config_manager.get("providers." + provider_key + ".memory_window", 100) if provider_key else 100
             unconsolidated = len(session.messages) - session.last_consolidated
             if unconsolidated >= memory_window:
                 print(f"[AgentLoop] 自动触发记忆整合: 未整合消息 {unconsolidated} >= {memory_window}")

@@ -25,6 +25,7 @@ from app.schema import (
     UpdateHeartbeatConfigRequest,
     UpdateMCPServerRequest,
     UpdateProviderRequest,
+    WriteFileRequest,
 )
 from cron.types import CronSchedule
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -638,7 +639,14 @@ def _require_provider(provider_key: str) -> dict:
 
 
 def _build_agent_entry(agent_key: str, cfg: dict) -> dict:
-    return {"key": agent_key, "builtin": agent_key in BUILTIN_AGENTS, **cfg}
+    return {
+        "key": agent_key,
+        "builtin": agent_key in BUILTIN_AGENTS,
+        "name": cfg.get("name", ""),
+        "description": cfg.get("description", ""),
+        "provider": cfg.get("provider", ""),
+        "emoji": cfg.get("emoji", ""),
+    }
 
 
 def _build_channel_entry(channel_key: str, cfg: dict) -> dict:
@@ -654,6 +662,7 @@ def _build_channel_entry(channel_key: str, cfg: dict) -> dict:
         "settings": cfg.get("settings", {}),
         "builtin": bool(info and info.builtin),
         "running": getattr(channel, "_running", True) if channel else False,
+        "emoji": cfg.get("emoji", ""),
     }
 
 
@@ -663,6 +672,10 @@ def _build_provider_entry(provider_key: str, cfg: dict) -> dict:
         "type": cfg.get("type", provider_key),
         "description": cfg.get("description", ""),
         "settings": cfg.get("settings", {}),
+        "model": cfg.get("model", ""),
+        "memory_window": cfg.get("memory_window", 100),
+        "thinking": cfg.get("thinking", "none"),
+        "emoji": cfg.get("emoji", ""),
         "used_by_agents": _get_provider_usages(provider_key),
     }
 
@@ -787,6 +800,10 @@ async def add_provider(request: AddProviderRequest):
             "type": request.type,
             "description": request.description,
             "settings": request.settings,
+            "model": request.model,
+            "memory_window": request.memory_window,
+            "thinking": request.thinking,
+            "emoji": request.emoji,
         },
     )
     return {"message": f"provider '{request.key}' 已添加"}
@@ -806,6 +823,16 @@ async def update_provider(key: str, request: UpdateProviderRequest):
         merged_cfg["description"] = request.description
     if request.settings is not None:
         merged_cfg["settings"] = {**existing_cfg.get("settings", {}), **request.settings}
+    if request.model is not None:
+        merged_cfg["model"] = request.model
+    if request.memory_window is not None:
+        if request.memory_window <= 0:
+            raise HTTPException(status_code=400, detail="memory_window 必须大于 0")
+        merged_cfg["memory_window"] = request.memory_window
+    if request.thinking is not None:
+        merged_cfg["thinking"] = request.thinking
+    if request.emoji is not None:
+        merged_cfg["emoji"] = request.emoji
 
     provider_type = merged_cfg.get("type", key)
     settings = merged_cfg.get("settings", {})
@@ -834,6 +861,43 @@ async def delete_provider(key: str):
     providers_cfg.pop(key, None)
     config_manager.set("providers", providers_cfg)
     return {"message": f"provider '{key}' 已删除"}
+
+
+@app.post("/providers/{key}/test")
+async def test_provider(key: str):
+    """向 provider 发送一条极简消息以验证连通性。"""
+    cfg = config_manager.get(f"providers.{key}")
+    if not cfg:
+        raise HTTPException(status_code=404, detail=f"provider '{key}' 不存在")
+
+    registry = _build_provider_registry()
+    provider_type = cfg.get("type", key)
+    info = registry.get(provider_type)
+    if not info:
+        raise HTTPException(status_code=400, detail=f"不支持的 provider 类型: {provider_type}")
+
+    model = cfg.get("model", "")
+    if not model:
+        raise HTTPException(status_code=400, detail="provider 未配置 model")
+
+    settings = cfg.get("settings", {})
+    adapter = info.cls(**settings)
+
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            None,
+            lambda: adapter.response(
+                model,
+                [{"role": "user", "content": "Hi"}],
+                None,
+                thinking="none",
+            ),
+        )
+        reply = (result.content or "")[:200]
+        return {"ok": True, "reply": reply}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 # ── Channel 管理端点 ──────────────────────────────────────────────────────────
@@ -897,6 +961,7 @@ async def add_channel(request: AddChannelRequest):
         "agent_name": request.agent_name,
         "description": request.description,
         "settings": request.settings,
+        "emoji": request.emoji,
     }
     config_manager.set(f"channels.{request.key}", cfg)
     await get_channel_manager()._start_channel(request.key, info, cfg)
@@ -921,6 +986,8 @@ async def update_channel(key: str, request: UpdateChannelRequest):
         merged_cfg["description"] = request.description
     if request.settings is not None:
         merged_cfg["settings"] = {**existing_cfg.get("settings", {}), **request.settings}
+    if request.emoji is not None:
+        merged_cfg["emoji"] = request.emoji
 
     config_manager.set(f"channels.{key}", merged_cfg)
     if get_channel_manager().get(key) is not None:
@@ -998,12 +1065,8 @@ async def add_agent(request: AddAgentRequest):
     config_manager.set(f"agents.{request.name}", {
         "name": request.display_name,
         "description": request.description,
-        "model_settings": {
-            "model": request.model,
-            "provider": request.provider,
-            "memory_window": request.memory_window,
-            "thinking": request.thinking,
-        },
+        "provider": request.provider,
+        "emoji": request.emoji,
     })
     return {"message": f"agent '{request.name}' 已创建"}
 
@@ -1013,25 +1076,17 @@ async def update_agent(name: str, request: UpdateAgentRequest):
     """部分更新 agent 配置。"""
     existing_cfg = _require_agent(name)
     merged_cfg = dict(existing_cfg)
-    ms = dict(merged_cfg.get("model_settings", {}))
 
     if request.display_name is not None:
         merged_cfg["name"] = request.display_name
     if request.description is not None:
         merged_cfg["description"] = request.description
-    if request.model is not None:
-        ms["model"] = request.model
     if request.provider is not None:
         _validate_agent_provider(request.provider)
-        ms["provider"] = request.provider
-    if request.memory_window is not None:
-        if request.memory_window <= 0:
-            raise HTTPException(status_code=400, detail="memory_window 必须大于 0")
-        ms["memory_window"] = request.memory_window
-    if request.thinking is not None:
-        ms["thinking"] = request.thinking
+        merged_cfg["provider"] = request.provider
+    if request.emoji is not None:
+        merged_cfg["emoji"] = request.emoji
 
-    merged_cfg["model_settings"] = ms
     config_manager.set(f"agents.{name}", merged_cfg)
     return {"message": f"agent '{name}' 已更新"}
 
@@ -1063,6 +1118,50 @@ async def delete_agent(name: str):
     agents_cfg.pop(name, None)
     config_manager.set("agents", agents_cfg)
     return {"message": f"agent '{name}' 已删除"}
+
+
+# ── Agent Workspace Files ──────────────────────────────────────────────────────
+
+EDITABLE_AGENT_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "BOOTSTRAP.md"}
+
+
+@app.get("/agents/{name}/files")
+async def list_agent_files(name: str):
+    """列出 agent workspace 下可编辑的 md 文件。"""
+    _require_agent(name)
+    agent_dir = WORKSPACE_DIR / "agents" / name
+    if not agent_dir.exists():
+        return {"files": []}
+    files = [
+        f.name for f in sorted(agent_dir.iterdir())
+        if f.is_file() and f.name in EDITABLE_AGENT_FILES
+    ]
+    return {"files": files}
+
+
+@app.get("/agents/{name}/files/{filename}")
+async def read_agent_file(name: str, filename: str):
+    """读取 agent workspace 下的单个 md 文件内容。"""
+    _require_agent(name)
+    if filename not in EDITABLE_AGENT_FILES:
+        raise HTTPException(status_code=400, detail=f"不可读取的文件: {filename}")
+    file_path = WORKSPACE_DIR / "agents" / name / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件 '{filename}' 不存在")
+    content = file_path.read_text(encoding="utf-8")
+    return {"filename": filename, "content": content}
+
+
+@app.put("/agents/{name}/files/{filename}")
+async def write_agent_file(name: str, filename: str, body: WriteFileRequest):
+    """写入 agent workspace 下的单个 md 文件。"""
+    _require_agent(name)
+    if filename not in EDITABLE_AGENT_FILES:
+        raise HTTPException(status_code=400, detail=f"不可编辑的文件: {filename}")
+    file_path = WORKSPACE_DIR / "agents" / name / filename
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(body.content, encoding="utf-8")
+    return {"message": f"文件 '{filename}' 已保存"}
 
 
 # ── Skills 管理端点 ────────────────────────────────────────────────────────────

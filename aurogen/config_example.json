@@ -3,12 +3,8 @@
         "main": {
             "name": "main",
             "description": "main agent",
-            "model_settings": {
-                "model": "gpt-5.2",
-                "provider": "openai_custom",
-                "memory_window": 100,
-                "thinking": "high"
-            }
+            "provider": "openai_custom",
+            "emoji": "🐾"
         }
     },
     "providers": {
@@ -18,7 +14,11 @@
             "settings": {
                 "api_key": "sk-xxx",
                 "api_base": "https://api.openai.com/v1"
-            }
+            },
+            "model": "gpt-5.2",
+            "memory_window": 100,
+            "thinking": "high",
+            "emoji": "🧠"
         }
     },
     "channels": {
@@ -26,7 +26,8 @@
             "type": "web",
             "agent_name": "main",
             "description": "web channel",
-            "settings": {}
+            "settings": {},
+            "emoji": "🌐"
         }
     },
     "mcp": {},

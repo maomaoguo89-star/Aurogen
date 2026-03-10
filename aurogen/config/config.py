@@ -48,9 +48,74 @@ class ConfigManager:
             if self.config_path.exists():
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                migrated, data = self._migrate_model_settings(data)
                 self._config = AppConfig(**data)
+                if migrated:
+                    with open(self.config_path, "w", encoding="utf-8") as f:
+                        json.dump(self._config.model_dump(), f, indent=4, ensure_ascii=False)
             else:
                 self._config = AppConfig()
+
+    @staticmethod
+    def _migrate_model_settings(data: dict) -> tuple[bool, dict]:
+        """Migrate old config format where model_settings lived inside agents.
+
+        Returns (migrated, data) where migrated indicates if changes were made.
+        """
+        agents = data.get("agents", {})
+        providers = data.get("providers", {})
+        needs_migration = any(
+            isinstance(cfg, dict) and "model_settings" in cfg
+            for cfg in agents.values()
+        )
+        if not needs_migration:
+            return False, data
+
+        from loguru import logger
+        logger.info("[Config] 检测到旧格式 model_settings，开始自动迁移")
+
+        provider_model_map: dict[str, tuple] = {}
+        for agent_key, agent_cfg in agents.items():
+            ms = agent_cfg.get("model_settings")
+            if not isinstance(ms, dict):
+                continue
+            provider_key = ms.get("provider", "")
+            model = ms.get("model", "")
+            memory_window = ms.get("memory_window", 100)
+            thinking = ms.get("thinking", "none")
+            fingerprint = (provider_key, model, memory_window, thinking)
+
+            if provider_key in providers:
+                existing_fp = provider_model_map.get(provider_key)
+                if existing_fp is None:
+                    providers[provider_key].setdefault("model", model)
+                    providers[provider_key].setdefault("memory_window", memory_window)
+                    providers[provider_key].setdefault("thinking", thinking)
+                    provider_model_map[provider_key] = fingerprint
+                    agent_cfg.pop("model_settings", None)
+                    agent_cfg["provider"] = provider_key
+                elif existing_fp == fingerprint:
+                    agent_cfg.pop("model_settings", None)
+                    agent_cfg["provider"] = provider_key
+                else:
+                    new_key = f"{provider_key}_{agent_key}"
+                    providers[new_key] = {
+                        **providers[provider_key],
+                        "model": model,
+                        "memory_window": memory_window,
+                        "thinking": thinking,
+                    }
+                    agent_cfg.pop("model_settings", None)
+                    agent_cfg["provider"] = new_key
+                    logger.info(f"[Config] agent '{agent_key}' 使用不同 model 设置，创建新 provider '{new_key}'")
+            else:
+                agent_cfg.pop("model_settings", None)
+                agent_cfg["provider"] = provider_key
+
+        data["agents"] = agents
+        data["providers"] = providers
+        logger.info("[Config] model_settings 迁移完成")
+        return True, data
 
     def _save(self) -> None:
         """保存配置到文件"""
