@@ -193,15 +193,18 @@ echo ^)
 echo.
 echo set "PATH=%%ROOT%%\runtime\python;%%ROOT%%\runtime\python\Scripts;%%ROOT%%\runtime\node;%%PATH%%"
 echo.
-echo echo [aurogen] 启动 Aurogen...
+echo echo [aurogen] Starting Aurogen...
 echo for /f "tokens=*" %%%%v in ^('"%%PYTHON%%" --version'^) do echo [aurogen] Python: %%%%v
 echo for /f "tokens=*" %%%%v in ^('"%%NODE%%" --version'^) do echo [aurogen] Node:   %%%%v
 echo.
-echo :: 轮询端口就绪后打开浏览器
-echo start "" /b powershell -NoProfile -Command "for ($i=0; $i -lt 60; $i++) { try { $null = Invoke-WebRequest -Uri http://localhost:8000 -UseBasicParsing -TimeoutSec 1; Start-Process 'http://localhost:8000'; break } catch { Start-Sleep -Milliseconds 500 } }"
-echo.
 echo cd /d "%%ROOT%%\aurogen"
 echo "%%PYTHON%%" -m uvicorn app.app:app --host 0.0.0.0 --port 8000
+echo.
+echo echo.
+echo echo =====================================================
+echo echo   Aurogen is running.
+echo echo   Open in browser: http://localhost:8000
+echo echo =====================================================
 echo.
 echo pause
 ) > "%PACKAGE_DIR%\start.bat"
