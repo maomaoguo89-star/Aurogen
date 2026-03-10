@@ -23,6 +23,7 @@
 
 ## 📢 News
 
+- **2026-03-11** — **We released one-click installer packages — download from [Releases](https://github.com/UniRound-Tec/Aurogen/releases)!**
 - **2026-03-10** — **Aurogen is live! Come taste an 🍊!**
 
 ---
@@ -60,7 +61,26 @@ More unique features will be documented as the project evolves.
 
 ### One-click Installer
 
-> Coming soon!
+Download the package for your platform from [Releases](https://github.com/UniRound-Tec/Aurogen/releases). Each package includes Python and Node.js runtimes — no additional software installation required.
+
+| Platform | Architecture | File |
+|----------|-------------|------|
+| macOS | Apple Silicon (M1/M2/M3/M4) | `aurogen-x.x.x-macos-arm64.tar.gz` |
+| Linux | ARM64 | `aurogen-x.x.x-linux-arm64.tar.gz` |
+| Linux | x86_64 | `aurogen-x.x.x-linux-x64.tar.gz` |
+| Windows | x64 | `aurogen-x.x.x-windows-x64.zip` |
+
+**macOS / Linux:**
+
+```bash
+tar -xzf aurogen-x.x.x-<platform>.tar.gz
+cd aurogen-x.x.x-<platform>
+bash start.sh
+```
+
+**Windows:** Extract the zip, then double-click `start.bat`.
+
+Open `http://localhost:8000` in your browser. All configuration is done through the web interface.
 
 ### Docker
 

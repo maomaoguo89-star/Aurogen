@@ -23,6 +23,7 @@
 
 ## 📢 新闻
 
+- **2026-03-11** - **我们发布了一键启动整合包，在release里面下载使用**
 - **2026-03-10** — **Aurogen 正式发布！赶快来尝尝🍊吧！**
 
 ---
@@ -60,7 +61,27 @@
 
 ### 一键安装包
 
-> 正在准备中，敬请期待！
+前往 [Releases](https://github.com/UniRound-Tec/Aurogen/releases) 下载对应平台的整合包，内置 Python 和 Node.js 运行时，无需安装任何额外软件。
+
+| 平台 | 架构 | 文件 |
+|------|------|------|
+| macOS | Apple Silicon (M1/M2/M3/M4) | `aurogen-x.x.x-macos-arm64.tar.gz` |
+| Linux | ARM64 | `aurogen-x.x.x-linux-arm64.tar.gz` |
+| Linux | x86_64 | `aurogen-x.x.x-linux-x64.tar.gz` |
+| Windows | x64 | `aurogen-x.x.x-windows-x64.zip` |
+
+**macOS / Linux：**
+
+```bash
+tar -xzf aurogen-x.x.x-<平台>.tar.gz
+cd aurogen-x.x.x-<平台>
+bash start.sh
+```
+
+**Windows：** 解压后双击 `start.bat`
+
+在浏览器中打开 `http://localhost:8000`，所有配置均在 Web 界面中完成。
+
 
 ### Docker
 
