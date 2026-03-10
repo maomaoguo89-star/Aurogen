@@ -7,12 +7,18 @@ import {
   EyeOff,
   KeyRound,
   LoaderCircle,
+  Monitor,
+  Moon,
+  Palette,
+  Sun,
   Timer,
   X,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { fetchJson, AUTH_STORAGE_KEY } from '@/lib/api'
+import { useTheme, type ThemePreference } from '@/features/theme/use-theme'
+import { useLocale } from '@/features/locale/use-locale'
 
 type HeartbeatConfig = {
   agent_name: string
@@ -216,6 +222,7 @@ export function SettingsPage() {
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
+          <AppearanceCard />
           <HeartbeatCard
             config={heartbeat}
             agents={agents}
@@ -235,6 +242,78 @@ export function SettingsPage() {
         </div>
       )}
     </section>
+  )
+}
+
+function AppearanceCard() {
+  const { t } = useTranslation()
+  const { preference, setPreference } = useTheme()
+  const { locale, setLocale } = useLocale()
+
+  const themeOptions: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+    { value: 'light', label: t('settings.themeLight'), icon: Sun },
+    { value: 'dark', label: t('settings.themeDark'), icon: Moon },
+    { value: 'system', label: t('settings.themeSystem'), icon: Monitor },
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: 0 }}
+      className="panel-surface flex flex-col gap-5 p-5"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
+          <Palette className="h-4 w-4 text-[var(--color-accent)]" />
+        </div>
+        <div>
+          <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('settings.appearanceTitle')}</h3>
+          <p className="text-[11px] tertiary-text">{t('settings.appearanceDesc')}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FormField label={t('settings.language')}>
+          <div className="flex gap-2">
+            {(['en', 'zh'] as const).map((lang) => (
+              <button
+                key={lang}
+                type="button"
+                onClick={() => setLocale(lang)}
+                className={
+                  locale === lang
+                    ? 'flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-accent-soft)] px-3 py-2 text-[13px] font-medium text-[var(--color-text-primary)] transition'
+                    : 'flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-3 py-2 text-[13px] text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-primary)]'
+                }
+              >
+                {lang === 'en' ? 'English' : '中文'}
+              </button>
+            ))}
+          </div>
+        </FormField>
+
+        <FormField label={t('settings.theme')}>
+          <div className="flex gap-2">
+            {themeOptions.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setPreference(value)}
+                className={
+                  preference === value
+                    ? 'flex-1 inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-accent-soft)] px-3 py-2 text-[13px] font-medium text-[var(--color-text-primary)] transition'
+                    : 'flex-1 inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-3 py-2 text-[13px] text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-primary)]'
+                }
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </FormField>
+      </div>
+    </motion.div>
   )
 }
 

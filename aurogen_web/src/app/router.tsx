@@ -28,11 +28,11 @@ export const router = createBrowserRouter([
         element: <ChatPage />,
       },
       {
-        path: '/sessions',
-        element: <SessionsPage />,
+        path: '/brains',
+        element: <ProvidersPage />,
       },
       {
-        path: '/agents',
+        path: '/claws',
         element: <AgentsPage />,
       },
       {
@@ -40,20 +40,20 @@ export const router = createBrowserRouter([
         element: <ChannelsPage />,
       },
       {
-        path: '/cron',
-        element: <CronPage />,
+        path: '/skills',
+        element: <SkillsPage />,
       },
       {
-        path: '/providers',
-        element: <ProvidersPage />,
+        path: '/cron',
+        element: <CronPage />,
       },
       {
         path: '/mcp',
         element: <McpPage />,
       },
       {
-        path: '/skills',
-        element: <SkillsPage />,
+        path: '/sessions',
+        element: <SessionsPage />,
       },
       {
         path: '/status',

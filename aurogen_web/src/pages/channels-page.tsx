@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   ChevronDown,
   LoaderCircle,
   Plus,
-  Radio,
   RefreshCw,
   Search,
   Shield,
@@ -23,6 +22,7 @@ type ChannelEntry = {
   settings: Record<string, string>
   builtin: boolean
   running: boolean
+  emoji: string
 }
 
 type SupportedType = {
@@ -42,6 +42,21 @@ type AddChannelFormData = {
   agent_name: string
   description: string
   settings: Record<string, string>
+  emoji: string
+}
+
+const EMOJI_PALETTE = [
+  '🧠', '🤖', '⚡', '✨', '🚀', '🔥', '💡', '🌈', '🌍', '🎯',
+  '🔮', '💫', '🧊', '💎', '🌟', '🐍', '🐻', '🦅', '🦙', '👾',
+  '🎨', '🔒', '🛠️', '💬', '👥', '🐾', '🐱', '🦁', '🐺', '🦊',
+  '🐸', '🦋', '🐝', '🦄', '🐳', '🐙', '🦑', '🦖', '🐲', '🦜',
+  '😎', '🥳', '🤩', '😈', '👻', '💀', '🎃', '🤠', '🥷', '🧙',
+  '🌸', '🍀', '🌵', '🍄', '🌙', '☀️', '🌊', '❄️', '🔔', '🎵',
+  '🎮', '🕹️', '📱', '💻', '🖥️', '⌨️', '🧲', '🔬', '🧪', '💊',
+]
+
+function getDisplayEmoji(channel: ChannelEntry): string {
+  return channel.emoji || '💬'
 }
 
 async function fetchChannelsConfig() {
@@ -66,7 +81,7 @@ async function addChannel(data: AddChannelFormData) {
 
 async function updateChannel(
   key: string,
-  data: { agent_name?: string; description?: string; settings?: Record<string, string> },
+  data: { agent_name?: string; description?: string; settings?: Record<string, string>; emoji?: string },
 ) {
   return fetchJson<{ message: string }>(`/channels/${encodeURIComponent(key)}`, {
     method: 'PATCH',
@@ -126,18 +141,15 @@ function useChannelsController() {
     let active = true
     async function init() {
       setLoading(true)
-      const list = await reload()
+      await reload()
       if (!active) return
-      if (list.length > 0 && !selectedKey) {
-        setSelectedKey(list[0].key)
-      }
       setLoading(false)
     }
     void init()
     return () => {
       active = false
     }
-  }, [reload, selectedKey])
+  }, [reload])
 
   const handleAdd = useCallback(
     async (data: AddChannelFormData) => {
@@ -162,7 +174,7 @@ function useChannelsController() {
   const handleUpdate = useCallback(
     async (
       key: string,
-      data: { agent_name?: string; description?: string; settings?: Record<string, string> },
+      data: { agent_name?: string; description?: string; settings?: Record<string, string>; emoji?: string },
     ) => {
       setSaving(true)
       setError(null)
@@ -272,45 +284,15 @@ export function ChannelsPage() {
     )
   }, [searchValue, channels])
 
+  const drawerOpen = selectedKey !== null
+
+  const closeDrawer = () => {
+    setSelectedKey(null)
+    setEditMode(false)
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
-      <header className="panel-surface flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-        <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
-            <Radio className="h-4.5 w-4.5 text-[var(--color-accent)]" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-[11px] tracking-[0.06em] tertiary-text">{t('channels.resourceConsole')}</p>
-            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Channels</h1>
-            <p className="max-w-3xl text-[13px] subtle-text">
-              {t('channels.description')}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              void handleReload()
-            }}
-            disabled={reloading}
-            className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 px-4 py-2 text-[13px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', reloading && 'animate-spin')} />
-            Reload
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent-hover)]"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Channel
-          </button>
-        </div>
-      </header>
-
       {error ? (
         <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -324,29 +306,44 @@ export function ChannelsPage() {
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <section className="panel-surface flex min-h-0 flex-col p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{t('channels.channelList')}</h2>
-            <span className="rounded-full border border-[var(--color-border-subtle)] px-3 py-1 text-[11px] tertiary-text">
-              {channels.length} total
-            </span>
-          </div>
+      <div className="panel-surface flex items-center gap-3 px-5 py-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
+          <input
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder={t('channels.search')}
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] py-2 pl-9 pr-4 text-[13px] text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
+          />
+        </div>
+        <div className="rounded-full border border-[var(--color-border-subtle)] px-3 py-1 text-[11px] subtle-text">
+          {channels.length} total
+        </div>
+        <button
+          type="button"
+          onClick={() => { void handleReload() }}
+          disabled={reloading}
+          className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 px-4 py-2 text-[12px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', reloading && 'animate-spin')} />
+          Reload
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] px-4 py-2 text-[12px] font-medium text-[var(--color-text-primary)] transition-all duration-150 hover:-translate-y-px hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent-hover)] hover:shadow-[0_2px_12px_var(--color-accent-soft)]"
+        >
+          <Plus className="h-4 w-4" />
+          Add Channel
+        </button>
+      </div>
 
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-            <input
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              placeholder={t('channels.search')}
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] py-2 pl-9 pr-4 text-[13px] text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-            />
-          </div>
-
-          <div className="scroll-area flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1">
-            {loading ? (
-              <ChannelListSkeleton />
-            ) : filteredChannels.length > 0 ? (
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="scroll-area h-full overflow-y-auto p-1">
+          {loading ? (
+            <CardGridSkeleton />
+          ) : filteredChannels.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               <AnimatePresence mode="popLayout">
                 {filteredChannels.map((channel, index) => {
                   const selected = selectedKey === channel.key
@@ -354,95 +351,95 @@ export function ChannelsPage() {
                     <motion.button
                       key={channel.key}
                       type="button"
-                      initial={{ opacity: 0, y: 6 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2, delay: index * 0.03 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2, delay: index * 0.02 }}
                       onClick={() => {
                         setSelectedKey(channel.key)
                         setEditMode(false)
                       }}
                       className={cn(
-                        'group w-full rounded-[var(--radius-md)] border px-4 py-3.5 text-left transition-all duration-150',
+                        'group flex w-full flex-col rounded-[var(--radius-md)] border p-4 text-left transition-all duration-150',
                         selected
-                          ? 'border-[var(--color-border-strong)] bg-[var(--color-accent-soft)]'
-                          : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 hover:-translate-y-px hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)]/50 hover:shadow-[var(--shadow-sm)]',
+                          ? 'border-[var(--color-border-strong)] bg-[var(--color-accent-soft)] shadow-[var(--shadow-sm)]'
+                          : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] hover:-translate-y-px hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)]/50 hover:shadow-[var(--shadow-sm)]',
                       )}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">
-                              {channel.key}
-                            </p>
-                            {channel.builtin ? (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
-                                <Shield className="h-2.5 w-2.5" />
-                                builtin
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 truncate text-[11px] tertiary-text">
-                            {channel.type} · {channel.agent_name}
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            'flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium',
-                            channel.running
-                              ? 'bg-[color:var(--color-success)]/15 text-[var(--color-success)]'
-                              : 'bg-[var(--color-bg-active)] text-[var(--color-text-tertiary)]',
-                          )}
-                        >
+                      <div className="mb-3 flex items-start justify-between gap-2">
+                        <span className="text-2xl leading-none" role="img">
+                          {getDisplayEmoji(channel)}
+                        </span>
+                        <div className="flex items-center gap-1.5">
                           <span
                             className={cn(
-                              'h-1.5 w-1.5 rounded-full',
+                              'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium',
                               channel.running
-                                ? 'bg-[var(--color-success)]'
-                                : 'bg-[var(--color-border-subtle)]',
+                                ? 'bg-[color:var(--color-success)]/15 text-[var(--color-success)]'
+                                : 'bg-[var(--color-bg-active)] text-[var(--color-text-tertiary)]',
                             )}
-                          />
-                          {channel.running ? 'online' : 'offline'}
-                        </span>
+                          >
+                            <span
+                              className={cn(
+                                'h-1.5 w-1.5 rounded-full',
+                                channel.running ? 'bg-[var(--color-success)]' : 'bg-[var(--color-border-subtle)]',
+                              )}
+                            />
+                            {channel.running ? 'online' : 'offline'}
+                          </span>
+                          {channel.builtin ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                              <Shield className="h-2.5 w-2.5" />
+                              builtin
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
+                      <p className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">
+                        {channel.key}
+                      </p>
+                      <p className="mt-1 truncate text-[11px] tertiary-text">
+                        {channel.type} · {channel.agent_name}
+                      </p>
+                      {channel.description ? (
+                        <p className="mt-2 line-clamp-2 text-[11px] subtle-text">
+                          {channel.description}
+                        </p>
+                      ) : null}
                     </motion.button>
                   )
                 })}
               </AnimatePresence>
-            ) : (
-              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-4 py-6 text-center text-sm subtle-text">
+            </div>
+          ) : (
+            <div className="flex h-full min-h-[200px] items-center justify-center">
+              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-6 py-8 text-center text-sm subtle-text">
                 {channels.length === 0
                   ? t('channels.emptyNoConfig')
                   : t('channels.emptyNoMatch')}
               </div>
-            )}
-          </div>
-        </section>
-
-        <section className="panel-surface min-h-[340px] flex-1 overflow-y-auto p-6">
-          {selectedChannel ? (
-            editMode ? (
-              <ChannelEditor
-                channel={selectedChannel}
-                agentOptions={agentOptions}
-                saving={saving}
-                onSave={async (data) => {
-                  await handleUpdate(selectedChannel.key, data)
-                  setEditMode(false)
-                }}
-                onCancel={() => setEditMode(false)}
-              />
-            ) : (
-              <ChannelDetail
-                channel={selectedChannel}
-                onEdit={() => setEditMode(true)}
-                onDelete={() => setPendingDeleteKey(selectedChannel.key)}
-              />
-            )
-          ) : (
-            <EmptyDetail loading={loading} />
+            </div>
           )}
-        </section>
+        </div>
+
+        <ChannelDrawer
+          open={drawerOpen}
+          channel={selectedChannel}
+          agentOptions={agentOptions}
+          editMode={editMode}
+          saving={saving}
+          onClose={closeDrawer}
+          onEdit={() => setEditMode(true)}
+          onCancelEdit={() => setEditMode(false)}
+          onSave={async (data) => {
+            if (!selectedChannel) return
+            await handleUpdate(selectedChannel.key, data)
+            setEditMode(false)
+          }}
+          onDelete={() => {
+            if (selectedChannel) setPendingDeleteKey(selectedChannel.key)
+          }}
+        />
       </div>
 
       <AddChannelModal
@@ -497,53 +494,23 @@ function ChannelDetail({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[11px] tracking-[0.06em] tertiary-text">Channel Detail</p>
-          <div className="mt-1 flex items-center gap-2.5">
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{channel.key}</h2>
-            {channel.builtin ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
-                <Shield className="h-2.5 w-2.5" />
-                builtin
-              </span>
-            ) : null}
-            <span
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium',
-                channel.running
-                  ? 'bg-[color:var(--color-success)]/15 text-[var(--color-success)]'
-                  : 'bg-[var(--color-bg-active)] text-[var(--color-text-tertiary)]',
-              )}
-            >
-              <span
-                className={cn(
-                  'h-1.5 w-1.5 rounded-full',
-                  channel.running ? 'bg-[var(--color-success)]' : 'bg-[var(--color-border-subtle)]',
-                )}
-              />
-              {channel.running ? 'online' : 'offline'}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="mb-5 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent-hover)]"
+        >
+          {t('common.edit')}
+        </button>
+        {!channel.builtin ? (
           <button
             type="button"
-            onClick={onEdit}
-            className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent-hover)]"
+            onClick={onDelete}
+            className="rounded-[var(--radius-sm)] border border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-danger)] transition hover:bg-[color:var(--color-danger)]/20"
           >
-            {t('common.edit')}
+            {t('common.delete')}
           </button>
-          {!channel.builtin ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="rounded-[var(--radius-sm)] border border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-danger)] transition hover:bg-[color:var(--color-danger)]/20"
-            >
-              {t('common.delete')}
-            </button>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -582,21 +549,24 @@ function ChannelEditor({
     agent_name?: string
     description?: string
     settings?: Record<string, string>
+    emoji?: string
   }) => Promise<void>
   onCancel: () => void
 }) {
   const { t } = useTranslation()
   const [agentName, setAgentName] = useState(channel.agent_name)
   const [description, setDescription] = useState(channel.description)
+  const [emoji, setEmoji] = useState(channel.emoji || '')
   const [settingsValues, setSettingsValues] = useState<Record<string, string>>(
     Object.fromEntries(Object.entries(channel.settings).map(([k, v]) => [k, String(v)])),
   )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload: { agent_name?: string; description?: string; settings?: Record<string, string> } = {}
+    const payload: { agent_name?: string; description?: string; settings?: Record<string, string>; emoji?: string } = {}
     if (agentName !== channel.agent_name) payload.agent_name = agentName
     if (description !== channel.description) payload.description = description
+    if (emoji !== (channel.emoji || '')) payload.emoji = emoji
 
     const settingsChanged = Object.keys(settingsValues).some(
       (k) => settingsValues[k] !== String(channel.settings[k] ?? ''),
@@ -624,16 +594,11 @@ function ChannelEditor({
       className="space-y-5"
     >
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[11px] tracking-[0.06em] tertiary-text">{t('channels.editChannel')}</p>
-          <div className="mt-1 flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
+          <EmojiPicker value={emoji} onChange={setEmoji} />
+          <div>
+            <p className="text-[11px] tracking-[0.06em] tertiary-text">{t('channels.editChannel')}</p>
             <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{channel.key}</h2>
-            {channel.builtin ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2.5 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
-                <Shield className="h-2.5 w-2.5" />
-                builtin
-              </span>
-            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -643,15 +608,15 @@ function ChannelEditor({
             disabled={saving}
             className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-text-primary)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-bg-app)] transition hover:bg-[var(--color-text-primary)]/90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
-                  {t('common.save')}
+            {t('common.cancel')}
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-text-primary)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-bg-app)] transition hover:bg-[var(--color-text-primary)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -705,6 +670,112 @@ function ChannelEditor({
   )
 }
 
+function ChannelDrawer({
+  open,
+  channel,
+  agentOptions,
+  editMode,
+  saving,
+  onClose,
+  onEdit,
+  onCancelEdit,
+  onSave,
+  onDelete,
+}: {
+  open: boolean
+  channel: ChannelEntry | null
+  agentOptions: AgentOption[]
+  editMode: boolean
+  saving: boolean
+  onClose: () => void
+  onEdit: () => void
+  onCancelEdit: () => void
+  onSave: (data: { agent_name?: string; description?: string; settings?: Record<string, string>; emoji?: string }) => Promise<void>
+  onDelete: () => void
+}) {
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [open, onClose])
+
+  return (
+    <AnimatePresence>
+      {open && channel ? (
+        <motion.aside
+          key="drawer-panel"
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="absolute inset-y-0 right-0 z-20 flex w-full max-w-[640px] flex-col rounded-l-[var(--radius-lg)] border-l border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-[var(--shadow-lg)]"
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border-subtle)] px-5 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl" role="img">{getDisplayEmoji(channel)}</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{channel.key}</p>
+                  {channel.builtin ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-accent)]">
+                      <Shield className="h-2.5 w-2.5" />
+                      builtin
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      channel.running
+                        ? 'bg-[color:var(--color-success)]/15 text-[var(--color-success)]'
+                        : 'bg-[var(--color-bg-active)] text-[var(--color-text-tertiary)]',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        channel.running ? 'bg-[var(--color-success)]' : 'bg-[var(--color-border-subtle)]',
+                      )}
+                    />
+                    {channel.running ? 'online' : 'offline'}
+                  </span>
+                </div>
+                <p className="text-[11px] tertiary-text">{channel.type} · {channel.agent_name}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[var(--radius-sm)] p-1.5 text-[var(--color-text-tertiary)] transition hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {editMode ? (
+              <ChannelEditor
+                channel={channel}
+                agentOptions={agentOptions}
+                saving={saving}
+                onSave={onSave}
+                onCancel={onCancelEdit}
+              />
+            ) : (
+              <ChannelDetail
+                channel={channel}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            )}
+          </div>
+        </motion.aside>
+      ) : null}
+    </AnimatePresence>
+  )
+}
+
 function AddChannelModal({
   open,
   supportedTypes,
@@ -725,6 +796,7 @@ function AddChannelModal({
   const [type, setType] = useState('')
   const [agentName, setAgentName] = useState('')
   const [description, setDescription] = useState('')
+  const [emoji, setEmoji] = useState('')
   const [settingsValues, setSettingsValues] = useState<Record<string, string>>({})
 
   const selectedSupportedType = supportedTypes.find((t) => t.type === type) ?? null
@@ -755,6 +827,7 @@ function AddChannelModal({
       setType(supportedTypes.length > 0 ? supportedTypes[0].type : '')
       setAgentName(agentOptions.length > 0 ? agentOptions[0].key : '')
       setDescription('')
+      setEmoji('')
       setSettingsValues({})
     }
   }, [open, supportedTypes, agentOptions])
@@ -771,6 +844,7 @@ function AddChannelModal({
       agent_name: agentName,
       description: description.trim(),
       settings: settingsValues,
+      emoji,
     })
   }
 
@@ -814,6 +888,10 @@ function AddChannelModal({
                   {t('channels.addChannelDesc')}
                 </p>
               </div>
+
+              <FormField label="Emoji">
+                <EmojiPicker value={emoji} onChange={setEmoji} />
+              </FormField>
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <FormField label="Key *">
@@ -1037,6 +1115,100 @@ function ConfirmDeleteModal({
   )
 }
 
+function EmojiPicker({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (emoji: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'flex h-10 items-center gap-2.5 rounded-[var(--radius-sm)] border px-3 text-[13px] transition',
+          'border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] hover:border-[var(--color-border-strong)]',
+        )}
+      >
+        <span className="text-xl leading-none">{value || '💬'}</span>
+        <span className="tertiary-text">{value ? 'Change' : 'Pick emoji'}</span>
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute left-0 top-full z-30 mt-1.5 w-[19.5rem] max-w-[min(19.5rem,calc(100vw-2rem))] overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-3 shadow-[var(--shadow-lg)]"
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => {
+                  const val = e.target.value
+                  const emojiMatch = val.match(/\p{Extended_Pictographic}/u)
+                  if (emojiMatch) {
+                    onChange(emojiMatch[0])
+                  } else if (val === '') {
+                    onChange('')
+                  }
+                }}
+                placeholder="Type or paste emoji"
+                className="w-32 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-2.5 py-1.5 text-[13px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-strong)]"
+              />
+              {value ? (
+                <button
+                  type="button"
+                  onClick={() => { onChange(''); setOpen(false) }}
+                  className="rounded-[var(--radius-sm)] p-1 text-[var(--color-text-tertiary)] transition hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <div className="max-h-[240px] overflow-y-auto overflow-x-hidden pr-1">
+              <div className="grid grid-cols-6 gap-2.5">
+              {EMOJI_PALETTE.map((em) => (
+                <button
+                  key={em}
+                  type="button"
+                  onClick={() => { onChange(em); setOpen(false) }}
+                  className={cn(
+                    'flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] text-xl transition hover:bg-[var(--color-bg-active)]',
+                    value === em && 'bg-[var(--color-accent-soft)] ring-1 ring-[var(--color-border-strong)]',
+                  )}
+                >
+                  {em}
+                </button>
+              ))}
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function DetailField({
   label,
   value,
@@ -1067,35 +1239,17 @@ function FormField({
   )
 }
 
-function EmptyDetail({ loading }: { loading: boolean }) {
-  const { t } = useTranslation()
+function CardGridSkeleton() {
   return (
-    <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-6 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]">
-        <Radio className="h-6 w-6 text-[var(--color-accent)]" />
-      </div>
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {loading ? t('channels.loadingChannel') : t('channels.selectChannel')}
-        </h3>
-        <p className="max-w-lg text-sm subtle-text">
-          {loading ? t('channels.loadingChannelDesc') : t('channels.selectChannelDesc')}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function ChannelListSkeleton() {
-  return (
-    <div className="space-y-2.5">
-      {Array.from({ length: 3 }).map((_, i) => (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="animate-pulse rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 px-4 py-4"
+          className="animate-pulse rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] p-4"
         >
+          <div className="mb-3 h-5 w-14 rounded-full bg-[var(--color-bg-active)]" />
           <div className="h-4 w-24 rounded bg-[var(--color-bg-active)]" />
-          <div className="mt-3 h-3 w-36 rounded bg-[var(--color-bg-hover)]/60" />
+          <div className="mt-2 h-3 w-36 rounded bg-[var(--color-bg-hover)]/60" />
         </div>
       ))}
     </div>

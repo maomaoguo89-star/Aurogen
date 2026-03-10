@@ -117,9 +117,9 @@ export function StatusPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <OverviewTile label="Agents" value={summary?.agents_count} />
+            <OverviewTile label="Claws" value={summary?.agents_count} />
             <OverviewTile label="Channels" value={summary?.channels_count} />
-            <OverviewTile label="Providers" value={summary?.providers_count} />
+            <OverviewTile label="Brains" value={summary?.providers_count} />
             <OverviewTile label="Sessions" value={summary?.sessions_count} />
           </div>
         </section>

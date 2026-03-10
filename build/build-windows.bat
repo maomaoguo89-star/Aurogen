@@ -157,6 +157,8 @@ xcopy "%RUNTIME%" "%PACKAGE_DIR%\runtime" /e /i /q >nul
 :: 复制后端代码
 xcopy "%ROOT%\aurogen" "%PACKAGE_DIR%\aurogen" /e /i /q >nul
 del /q "%PACKAGE_DIR%\aurogen\.workspace\config.json" 2>nul
+if exist "%PACKAGE_DIR%\aurogen\.workspace\agents\main" rmdir /s /q "%PACKAGE_DIR%\aurogen\.workspace\agents\main"
+del /q "%PACKAGE_DIR%\aurogen\.workspace\cron\jobs.json" 2>nul
 
 :: 复制前端构建产物
 mkdir "%PACKAGE_DIR%\aurogen_web" 2>nul

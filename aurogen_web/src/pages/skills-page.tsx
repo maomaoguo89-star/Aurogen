@@ -5,6 +5,7 @@ import {
   Bot,
   CheckCircle2,
   ChevronDown,
+  ExternalLink,
   LoaderCircle,
   Package,
   Search,
@@ -327,6 +328,16 @@ export function SkillsPage() {
             <Upload className="h-4 w-4" />
             Upload Skill
           </button>
+
+          <a
+            href="https://clawhub.ai/"
+            target="_blank"
+            rel="noreferrer"
+            className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] py-2 text-[12px] font-medium text-[var(--color-text-primary)] transition-all duration-150 hover:-translate-y-px hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)]"
+          >
+            <ExternalLink className="h-4 w-4" />
+            {t('skills.openClawHub')}
+          </a>
 
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />

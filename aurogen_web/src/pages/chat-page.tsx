@@ -49,12 +49,7 @@ type AgentDetail = {
   builtin: boolean
   name: string
   description: string
-  model_settings: {
-    model: string
-    provider: string
-    memory_window: number
-    thinking?: string
-  }
+  provider: string
 }
 
 type ChatMessage = {
@@ -659,8 +654,7 @@ export function ChatPage() {
   }, [searchValue, sessions])
 
   const { t } = useTranslation()
-  const providerName = currentAgent?.model_settings?.provider ?? t('chat.loadingProvider')
-  const modelName = currentAgent?.model_settings?.model ?? t('chat.waiting')
+  const providerName = currentAgent?.provider ?? t('chat.loadingProvider')
 
   const scrollConversationToBottom = useCallback((behavior: ScrollBehavior) => {
     const container = conversationScrollRef.current
@@ -931,7 +925,6 @@ export function ChatPage() {
           <div className="space-y-3">
             <KeyValue label="Agent" value={currentSession?.agentName ?? t('chat.waiting')} />
             <KeyValue label="Provider" value={providerName} />
-            <KeyValue label="Model" value={modelName} />
           </div>
 
           <div className="my-4 h-px bg-[var(--color-bg-active)]" />

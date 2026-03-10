@@ -134,9 +134,11 @@ mkdir -p "$PACKAGE_DIR"
 # 复制运行时
 cp -r "$RUNTIME" "$PACKAGE_DIR/runtime"
 
-# 复制后端代码（排除 config.json 以免泄露密钥）
+# 复制后端代码（排除敏感配置与本地工作区数据）
 cp -r "$ROOT/aurogen" "$PACKAGE_DIR/aurogen"
 rm -f "$PACKAGE_DIR/aurogen/.workspace/config.json"
+rm -rf "$PACKAGE_DIR/aurogen/.workspace/agents/main"
+rm -f "$PACKAGE_DIR/aurogen/.workspace/cron/jobs.json"
 
 # 复制前端构建产物
 mkdir -p "$PACKAGE_DIR/aurogen_web"

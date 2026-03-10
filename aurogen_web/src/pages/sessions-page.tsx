@@ -498,67 +498,47 @@ export function SessionsPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
-      {/* Header */}
-      <header className="panel-surface flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-        <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
-            <History className="h-4.5 w-4.5 text-[var(--color-accent)]" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-[11px] tracking-[0.06em] tertiary-text">{t('sessions.resourceConsole')}</p>
-            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('sessions.title')}</h1>
-          </div>
+      <div className="panel-surface flex items-center gap-3 px-5 py-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
+          <input
+            type="text"
+            placeholder={t('sessions.search')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] py-2 pl-9 pr-4 text-[13px] text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
+          />
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* Total badge */}
-          {!loading && (
-            <span className="rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-3 py-1 text-[12px] text-[var(--color-text-secondary)]">
-              {totalCount} sessions
-            </span>
-          )}
-
-          {/* Group-by toggle */}
-          <div className="flex rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/40 p-0.5">
-            {(['channel', 'agent'] as const).map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => {
-                  setGroupBy(g)
-                  setSelected(null)
-                }}
-                className={cn(
-                  'rounded-[calc(var(--radius-sm)-2px)] px-3.5 py-1.5 text-[12px] font-medium capitalize transition duration-[var(--duration-fast)]',
-                  groupBy === g
-                    ? 'bg-[var(--color-accent-soft)] text-[var(--color-text-primary)] shadow-[var(--shadow-sm)]'
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
-                )}
-              >
-                {g === 'channel' ? 'Channel' : 'Agent'}
-              </button>
-            ))}
+        {!loading && (
+          <div className="rounded-full border border-[var(--color-border-subtle)] px-3 py-1 text-[11px] subtle-text">
+            {totalCount} sessions
           </div>
+        )}
+        <div className="flex rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/40 p-0.5">
+          {(['channel', 'agent'] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => {
+                setGroupBy(g)
+                setSelected(null)
+              }}
+              className={cn(
+                'rounded-[calc(var(--radius-sm)-2px)] px-3.5 py-1.5 text-[12px] font-medium capitalize transition duration-[var(--duration-fast)]',
+                groupBy === g
+                  ? 'bg-[var(--color-accent-soft)] text-[var(--color-text-primary)] shadow-[var(--shadow-sm)]'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+              )}
+            >
+              {g === 'channel' ? 'Channel' : 'Agent'}
+            </button>
+          ))}
         </div>
-      </header>
+      </div>
 
-      {/* Body */}
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         {/* Left: grouped list */}
         <section className="panel-surface flex min-h-0 flex-col p-5">
-          {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" />
-            <input
-              type="text"
-              placeholder={t('sessions.search')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/40 py-2 pl-9 pr-3 text-[13px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--color-border-strong)] focus:outline-none"
-            />
-          </div>
-
-          {/* List content */}
           <div className="min-h-0 flex-1 overflow-y-auto">
             {loading && (
               <div className="flex h-full items-center justify-center gap-2 text-[13px] subtle-text">
