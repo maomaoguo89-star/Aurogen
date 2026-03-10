@@ -37,4 +37,8 @@ __pycache__/
 *.pyc
 *.pyo
 
+# 整合包运行时（构建产物，不提交）
+runtime/
+build/downloads/
+
 
