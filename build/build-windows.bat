@@ -128,17 +128,24 @@ echo [build] Node.js 就绪
 echo [build] ========== [4/5] 构建前端 (aurogen_web) ==========
 
 set "PATH=%NODE_DIR%;%PATH%"
+set "NPM_CMD=%NODE_DIR%\npm.cmd"
+set "npm_config_script_shell=%ComSpec%"
+
+if not exist "%NPM_CMD%" (
+    echo [error] 未找到 npm.cmd
+    goto :fail
+)
 
 pushd "%ROOT%\aurogen_web"
 echo [build] npm install...
-call npm install
+call "%NPM_CMD%" install
 if errorlevel 1 (
     popd
     echo [error] npm install 失败
     goto :fail
 )
 echo [build] npm run build...
-call npm run build
+call "%NPM_CMD%" run build
 if errorlevel 1 (
     popd
     echo [error] npm run build 失败
