@@ -23,8 +23,15 @@
 
 ## 📢 News
 
+- **2026-03-12** — **Documentation site is live, with UX improvements!**
 - **2026-03-11** — **We released one-click installer packages — download from [Releases](https://github.com/UniRound-Tec/Aurogen/releases)!**
 - **2026-03-10** — **Aurogen is live! Come taste an 🍊!**
+
+---
+
+## 📖 Documentation
+
+Visit [docs.aurogen.site](https://docs.aurogen.site) for the full documentation.
 
 ---
 
@@ -172,4 +179,4 @@ Use the top-right corner to switch themes and languages:
 
 ### Documentation
 
-> Documentation is being written — stay tuned!
+Visit [docs.aurogen.site](https://docs.aurogen.site) for the full documentation.

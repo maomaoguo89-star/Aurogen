@@ -23,10 +23,15 @@
 
 ## 📢 新闻
 
-- **2026-03-11** - **我们发布了一键启动整合包，在release里面下载使用**
+- **2026-03-12** — **文档网站上线，优化 UX 交互体验**
+- **2026-03-11** — **发布一键启动整合包，前往 [Releases](https://github.com/UniRound-Tec/Aurogen/releases) 下载使用！**
 - **2026-03-10** — **Aurogen 正式发布！赶快来尝尝🍊吧！**
 
 ---
+
+## 📖 文档
+
+前往 [docs.aurogen.site](https://docs.aurogen.site) 查看完整文档。
 
 ## 🏗️ 架构
 
@@ -173,4 +178,4 @@ npm run dev
 
 ### 文档
 
-> 文档正在加急编写中，敬请期待！
+前往 [docs.aurogen.site](https://docs.aurogen.site) 查看完整文档。
