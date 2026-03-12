@@ -56,7 +56,7 @@ def _ensure_main_agent():
     agent_dir = WORKSPACE_DIR / "agents" / "main"
     if agent_dir.exists() and any(agent_dir.iterdir()):
         return
-    logger.info("[App] main agent 工作区为空，从 template 初始化")
+    logger.info("[App] main agent workspace is empty, initializing from template")
     agent_dir.mkdir(parents=True, exist_ok=True)
     for src in TEMPLATE_DIR.rglob("*"):
         if src.suffix in (".py", ".pyc") or "__pycache__" in src.parts:
@@ -96,14 +96,14 @@ def _heartbeat_session_id(agent_name: str) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI 生命周期管理：启动和关闭 agent loop 及所有 channel。"""
+    """FastAPI lifespan: start and shutdown agent loop and all channels."""
     global agent_loop, heartbeat_manager
 
     _ensure_main_agent()
     for agent_name in config_manager.get("agents", {}):
         _ensure_agent_heartbeat_file(agent_name)
 
-    # 从 config 加载并启动所有 channel
+    # Load and start all channels from config
     channel_manager = get_channel_manager()
     await channel_manager.load_from_config()
 
@@ -137,9 +137,9 @@ async def lifespan(app: FastAPI):
 
     task = asyncio.create_task(agent_loop.run())
     await heartbeat_manager.start_all()
-    logger.info("[App] Agent loop 已启动，已加载 channel: {}", list(channel_manager._channels.keys()))
+    logger.info("[App] Agent loop started, loaded channels: {}", list(channel_manager._channels.keys()))
 
-    yield  # 应用运行中
+    yield  # Application running
 
     agent_loop.stop()
     heartbeat_manager.stop_all()
@@ -149,7 +149,7 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
-    logger.info("[App] Agent loop 已停止")
+    logger.info("[App] Agent loop stopped")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -168,7 +168,7 @@ _STATIC_EXTS = {
     ".woff", ".woff2", ".ttf", ".map", ".json", ".webmanifest",
 }
 
-# SPA 入口文件路径（Docker 部署时存在，本地开发时不存在）
+# SPA index path (exists in Docker deploy, not in local dev)
 _SPA_INDEX = Path(__file__).resolve().parent.parent.parent / "aurogen_web" / "dist" / "index.html"
 
 
@@ -180,12 +180,12 @@ async def auth_middleware(request: Request, call_next):
     if request.url.path in AUTH_PUBLIC_PATHS:
         return await call_next(request)
 
-    # 静态文件资源（有扩展名或根路径）不需要鉴权
+    # Static assets (with extension or root path) do not require auth
     if request.url.path == "/" or Path(request.url.path).suffix in _STATIC_EXTS:
         return await call_next(request)
 
-    # 浏览器页面导航（刷新 SPA 路由）→ 直接返回 index.html，让前端路由接管
-    # 避免与同名 API 端点冲突导致 401，SPA 加载后自行处理登录态
+    # Browser page navigation (SPA route refresh) → return index.html for frontend routing
+    # Avoid 401 from conflicting with same-named API; SPA handles auth after load
     if "text/html" in request.headers.get("Accept", "") and _SPA_INDEX.exists():
         return FileResponse(_SPA_INDEX)
 
@@ -198,12 +198,12 @@ async def auth_middleware(request: Request, call_next):
 
     auth_key = request.headers.get("X-Auth-Key", "")
     if auth_key != stored_password:
-        return JSONResponse(status_code=401, content={"detail": "认证失败"})
+        return JSONResponse(status_code=401, content={"detail": "Authentication failed"})
 
     return await call_next(request)
 
 
-# ── 认证端点 ──────────────────────────────────────────────────────────────────
+# ── Auth endpoints ─────────────────────────────────────────────────────────────
 
 
 @app.post("/check-auth")
@@ -223,16 +223,16 @@ async def check_auth(request: CheckAuthRequest):
 async def set_password(request: SetPasswordRequest):
     auth_cfg = config_manager.get("auth", {})
     if not auth_cfg.get("first_login", False):
-        raise HTTPException(status_code=403, detail="非首次登录，无法设置密码")
+        raise HTTPException(status_code=403, detail="Not first login, cannot set password")
     if not request.password:
-        raise HTTPException(status_code=400, detail="密码不能为空")
+        raise HTTPException(status_code=400, detail="Password cannot be empty")
 
     config_manager.set("auth.password", request.password)
     config_manager.set("auth.first_login", False)
     return {"status": "success"}
 
 
-# ── 配置端点 ──────────────────────────────────────────────────────────────────
+# ── Config endpoints ───────────────────────────────────────────────────────────
 
 @app.post("/set-config")
 async def set_config(request: SetConfigRequest):
@@ -245,7 +245,7 @@ async def get_config():
     return {"config": config_manager.get_full_config()}
 
 
-# ── MCP 管理端点 ─────────────────────────────────────────────────────────────
+# ── MCP management endpoints ──────────────────────────────────────────────────
 
 
 def _get_loaded_mcp_tools(server_key: str) -> list[str]:
@@ -273,13 +273,13 @@ def _validate_mcp_server_config(command: str, url: str) -> None:
     if not command and not url:
         raise HTTPException(
             status_code=400,
-            detail="MCP server 必须配置 command 或 url 中的至少一个",
+            detail="MCP server must have at least one of command or url configured",
         )
 
 
 @app.get("/mcp/config")
 async def get_mcp_config():
-    """返回所有已配置的 MCP servers 及其加载状态。"""
+    """Return all configured MCP servers and their load status."""
     mcp_cfg: dict = config_manager.get("mcp", {})
     return {
         "servers": [
@@ -291,18 +291,18 @@ async def get_mcp_config():
 
 @app.get("/mcp/{key}")
 async def get_mcp_detail(key: str):
-    """返回单个 MCP server 详情。"""
+    """Return a single MCP server detail."""
     cfg = config_manager.get(f"mcp.{key}")
     if not cfg:
-        raise HTTPException(status_code=404, detail=f"MCP server '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"MCP server '{key}' not found")
     return _build_mcp_entry(key, cfg)
 
 
 @app.post("/mcp")
 async def add_mcp_server(request: AddMCPServerRequest):
-    """新增 MCP server 配置并自动连接。"""
+    """Add MCP server config and connect automatically."""
     if config_manager.get(f"mcp.{request.key}"):
-        raise HTTPException(status_code=400, detail=f"MCP server '{request.key}' 已存在")
+        raise HTTPException(status_code=400, detail=f"MCP server '{request.key}' already exists")
 
     _validate_mcp_server_config(request.command, request.url)
 
@@ -318,15 +318,15 @@ async def add_mcp_server(request: AddMCPServerRequest):
     if agent_loop:
         await agent_loop.reload_mcp()
 
-    return {"message": f"MCP server '{request.key}' 已添加并加载"}
+    return {"message": f"MCP server '{request.key}' added and loaded"}
 
 
 @app.patch("/mcp/{key}")
 async def update_mcp_server(key: str, request: UpdateMCPServerRequest):
-    """部分更新 MCP server 配置并自动重连。"""
+    """Partially update MCP server config and reconnect automatically."""
     existing = config_manager.get(f"mcp.{key}")
     if not existing:
-        raise HTTPException(status_code=404, detail=f"MCP server '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"MCP server '{key}' not found")
 
     merged = dict(existing)
     if request.command is not None:
@@ -349,15 +349,15 @@ async def update_mcp_server(key: str, request: UpdateMCPServerRequest):
     if agent_loop:
         await agent_loop.reload_mcp()
 
-    return {"message": f"MCP server '{key}' 已更新并重新加载"}
+    return {"message": f"MCP server '{key}' updated and reloaded"}
 
 
 @app.delete("/mcp/{key}")
 async def delete_mcp_server(key: str):
-    """删除 MCP server 配置并卸载其工具。"""
+    """Remove MCP server config and unload its tools."""
     mcp_cfg: dict = config_manager.get("mcp", {})
     if key not in mcp_cfg:
-        raise HTTPException(status_code=404, detail=f"MCP server '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"MCP server '{key}' not found")
 
     mcp_cfg.pop(key, None)
     config_manager.set("mcp", mcp_cfg)
@@ -365,23 +365,23 @@ async def delete_mcp_server(key: str):
     if agent_loop:
         await agent_loop.reload_mcp()
 
-    return {"message": f"MCP server '{key}' 已删除"}
+    return {"message": f"MCP server '{key}' deleted"}
 
 
 @app.post("/mcp/reload")
 async def reload_mcp():
-    """重新读取 config 并重连所有 MCP servers。"""
+    """Re-read config and reconnect all MCP servers."""
     if agent_loop is None:
-        raise HTTPException(status_code=503, detail="Agent loop 未启动")
+        raise HTTPException(status_code=503, detail="Agent loop not started")
     await agent_loop.reload_mcp()
     return {"message": "MCP servers reloaded"}
 
 
-# ── Heartbeat 配置端点 ────────────────────────────────────────────────────────
+# ── Heartbeat config endpoints ─────────────────────────────────────────────────
 
 @app.get("/heartbeat/config")
 async def get_heartbeat_config(agent_name: str = "main"):
-    """返回指定 agent 的 heartbeat 配置。"""
+    """Return heartbeat config for the given agent."""
     _require_agent(agent_name)
     cfg = _get_heartbeat_agent_config(agent_name)
     return {
@@ -392,7 +392,7 @@ async def get_heartbeat_config(agent_name: str = "main"):
 
 @app.patch("/heartbeat/config")
 async def update_heartbeat_config(request: UpdateHeartbeatConfigRequest, agent_name: str = "main"):
-    """部分更新指定 agent 的 heartbeat 配置，并重启对应实例使配置生效。"""
+    """Partially update heartbeat config for the agent and restart instance to apply."""
     global heartbeat_manager
     _require_agent(agent_name)
     existing = _get_heartbeat_agent_config(agent_name)
@@ -400,7 +400,7 @@ async def update_heartbeat_config(request: UpdateHeartbeatConfigRequest, agent_n
 
     if request.interval_s is not None:
         if request.interval_s <= 0:
-            raise HTTPException(status_code=400, detail="interval_s 必须大于 0")
+            raise HTTPException(status_code=400, detail="interval_s must be greater than 0")
         merged["interval_s"] = request.interval_s
     if request.enabled is not None:
         merged["enabled"] = request.enabled
@@ -410,16 +410,16 @@ async def update_heartbeat_config(request: UpdateHeartbeatConfigRequest, agent_n
     if heartbeat_manager is not None:
         await heartbeat_manager.rebuild_agent(agent_name)
 
-    return {"message": "heartbeat 配置已更新"}
+    return {"message": "Heartbeat config updated"}
 
 
-# ── Cron Job 管理端点 ─────────────────────────────────────────────────────────
+# ── Cron Job management endpoints ─────────────────────────────────────────────
 
 
 def _cron_service():
-    """返回运行中的 CronService，未就绪时抛 503。"""
+    """Return running CronService; raise 503 when not ready."""
     if agent_loop is None:
-        raise HTTPException(status_code=503, detail="Agent loop 未启动")
+        raise HTTPException(status_code=503, detail="Agent loop not started")
     return agent_loop.cron_service
 
 
@@ -456,14 +456,14 @@ def _build_cron_job_entry(job) -> dict:
 
 @app.get("/cron/status")
 async def get_cron_status():
-    """返回 cron 服务运行状态及统计信息。"""
+    """Return cron service status and stats."""
     svc = _cron_service()
     return svc.status()
 
 
 @app.get("/cron/jobs")
 async def list_cron_jobs(include_disabled: bool = False):
-    """列出所有 cron job。include_disabled=true 时包含已禁用的 job。"""
+    """List all cron jobs. include_disabled=true includes disabled jobs."""
     svc = _cron_service()
     jobs = svc.list_jobs(include_disabled=include_disabled)
     return {"jobs": [_build_cron_job_entry(j) for j in jobs]}
@@ -471,18 +471,18 @@ async def list_cron_jobs(include_disabled: bool = False):
 
 @app.get("/cron/jobs/{job_id}")
 async def get_cron_job(job_id: str):
-    """获取单个 cron job 详情。"""
+    """Get a single cron job detail."""
     svc = _cron_service()
     jobs = svc.list_jobs(include_disabled=True)
     for job in jobs:
         if job.id == job_id:
             return _build_cron_job_entry(job)
-    raise HTTPException(status_code=404, detail=f"cron job '{job_id}' 不存在")
+    raise HTTPException(status_code=404, detail=f"cron job '{job_id}' not found")
 
 
 @app.post("/cron/jobs")
 async def add_cron_job(request: AddCronJobRequest):
-    """新增 cron job。"""
+    """Add a new cron job."""
     svc = _cron_service()
     schedule = CronSchedule(
         kind=request.schedule.kind,
@@ -503,12 +503,12 @@ async def add_cron_job(request: AddCronJobRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"message": f"cron job '{job.id}' 已创建", "job": _build_cron_job_entry(job)}
+    return {"message": f"cron job '{job.id}' created", "job": _build_cron_job_entry(job)}
 
 
 @app.patch("/cron/jobs/{job_id}")
 async def update_cron_job(job_id: str, request: UpdateCronJobRequest):
-    """部分更新 cron job。"""
+    """Partially update a cron job."""
     svc = _cron_service()
     schedule = None
     if request.schedule is not None:
@@ -534,58 +534,58 @@ async def update_cron_job(job_id: str, request: UpdateCronJobRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if job is None:
-        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' 不存在")
-    return {"message": f"cron job '{job_id}' 已更新", "job": _build_cron_job_entry(job)}
+        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' not found")
+    return {"message": f"cron job '{job_id}' updated", "job": _build_cron_job_entry(job)}
 
 
 @app.delete("/cron/jobs/{job_id}")
 async def delete_cron_job(job_id: str):
-    """删除 cron job。"""
+    """Delete a cron job."""
     svc = _cron_service()
     removed = svc.remove_job(job_id)
     if not removed:
-        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' 不存在")
-    return {"message": f"cron job '{job_id}' 已删除"}
+        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' not found")
+    return {"message": f"cron job '{job_id}' deleted"}
 
 
 @app.post("/cron/jobs/{job_id}/enable")
 async def enable_cron_job(job_id: str):
-    """启用 cron job。"""
+    """Enable a cron job."""
     svc = _cron_service()
     job = svc.enable_job(job_id, enabled=True)
     if job is None:
-        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' 不存在")
-    return {"message": f"cron job '{job_id}' 已启用", "job": _build_cron_job_entry(job)}
+        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' not found")
+    return {"message": f"cron job '{job_id}' enabled", "job": _build_cron_job_entry(job)}
 
 
 @app.post("/cron/jobs/{job_id}/disable")
 async def disable_cron_job(job_id: str):
-    """禁用 cron job。"""
+    """Disable a cron job."""
     svc = _cron_service()
     job = svc.enable_job(job_id, enabled=False)
     if job is None:
-        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' 不存在")
-    return {"message": f"cron job '{job_id}' 已禁用", "job": _build_cron_job_entry(job)}
+        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' not found")
+    return {"message": f"cron job '{job_id}' disabled", "job": _build_cron_job_entry(job)}
 
 
 @app.post("/cron/jobs/{job_id}/run")
 async def run_cron_job(job_id: str):
-    """手动立即触发 cron job（强制执行，即使已禁用）。"""
+    """Manually trigger cron job immediately (force run even if disabled)."""
     svc = _cron_service()
     ran = await svc.run_job(job_id, force=True)
     if not ran:
-        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' 不存在")
-    return {"message": f"cron job '{job_id}' 已触发"}
+        raise HTTPException(status_code=404, detail=f"cron job '{job_id}' not found")
+    return {"message": f"cron job '{job_id}' triggered"}
 
 
-# ── Provider 管理端点 ─────────────────────────────────────────────────────────
+# ── Provider management endpoints ──────────────────────────────────────────────
 
 
 def _require_provider_type(provider_type: str):
     registry = _build_provider_registry()
     info = registry.get(provider_type)
     if info is None:
-        raise HTTPException(status_code=400, detail=f"不支持的 provider 类型: {provider_type}")
+        raise HTTPException(status_code=400, detail=f"Unsupported provider type: {provider_type}")
     return info
 
 
@@ -596,7 +596,7 @@ def _validate_provider_config(provider_type: str, settings: dict) -> None:
         raise HTTPException(
             status_code=400,
             detail={
-                "message": f"provider 类型 '{provider_type}' 缺少必填 settings",
+                "message": f"Provider type '{provider_type}' missing required settings",
                 "missing_settings": missing,
             },
         )
@@ -623,21 +623,21 @@ def _get_agent_usages(agent_name: str) -> list[str]:
 def _require_agent(agent_name: str) -> dict:
     cfg = config_manager.get(f"agents.{agent_name}")
     if not cfg:
-        raise HTTPException(status_code=404, detail=f"agent '{agent_name}' 不存在")
+        raise HTTPException(status_code=404, detail=f"agent '{agent_name}' not found")
     return cfg
 
 
 def _require_channel(channel_key: str) -> dict:
     cfg = config_manager.get(f"channels.{channel_key}")
     if not cfg:
-        raise HTTPException(status_code=404, detail=f"channel '{channel_key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"channel '{channel_key}' not found")
     return cfg
 
 
 def _require_provider(provider_key: str) -> dict:
     cfg = config_manager.get(f"providers.{provider_key}")
     if not cfg:
-        raise HTTPException(status_code=404, detail=f"provider '{provider_key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"provider '{provider_key}' not found")
     return cfg
 
 
@@ -703,9 +703,9 @@ def _count_total_sessions() -> int:
 
 def _get_session_file(channel: str, session_id: str) -> tuple[str, Path]:
     if "/" in session_id or "\\" in session_id:
-        raise HTTPException(status_code=400, detail="session_id 非法")
+        raise HTTPException(status_code=400, detail="session_id invalid")
     if "@" in session_id and session_id.split("@", 1)[0] != channel:
-        raise HTTPException(status_code=400, detail="session_id 与 channel 不匹配")
+        raise HTTPException(status_code=400, detail="session_id does not match channel")
 
     agent_name = config_manager.get(f"channels.{channel}.agent_name", "main")
     session_file = WORKSPACE_DIR / "agents" / agent_name / "sessions" / f"{session_id}.json"
@@ -713,7 +713,7 @@ def _get_session_file(channel: str, session_id: str) -> tuple[str, Path]:
 
 
 def _build_session_info(session_id: str, session_file: Path, agent_name: str) -> SessionInfo:
-    """从 session 文件提取展示用元数据。"""
+    """Extract display metadata from session file."""
     parts = session_id.split("@", 1)
     channel = parts[0] if len(parts) > 0 else "unknown"
     chat_id = parts[1] if len(parts) > 1 else "unknown"
@@ -756,7 +756,7 @@ def _build_session_info(session_id: str, session_file: Path, agent_name: str) ->
 
 @app.get("/providers/supported")
 async def get_supported_providers():
-    """返回所有支持的 provider 类型及其所需配置字段。"""
+    """Return all supported provider types and their required config fields."""
     registry = _build_provider_registry()
     return {
         "supported": [
@@ -773,7 +773,7 @@ async def get_supported_providers():
 
 @app.get("/providers/config")
 async def get_providers_config():
-    """返回当前所有已配置的 provider 实例。"""
+    """Return all currently configured provider instances."""
     providers_cfg: dict = config_manager.get("providers", {})
     return {
         "providers": [
@@ -785,16 +785,16 @@ async def get_providers_config():
 
 @app.get("/providers/{key}")
 async def get_provider_detail(key: str):
-    """返回单个 provider 实例详情。"""
+    """Return a single provider instance detail."""
     cfg = _require_provider(key)
     return _build_provider_entry(key, cfg)
 
 
 @app.post("/providers")
 async def add_provider(request: AddProviderRequest):
-    """新增 provider 配置。"""
+    """Add a new provider config."""
     if config_manager.get(f"providers.{request.key}"):
-        raise HTTPException(status_code=400, detail=f"provider '{request.key}' 已存在")
+        raise HTTPException(status_code=400, detail=f"provider '{request.key}' already exists")
 
     _validate_provider_config(request.type, request.settings)
     config_manager.set(
@@ -809,15 +809,15 @@ async def add_provider(request: AddProviderRequest):
             "emoji": request.emoji,
         },
     )
-    return {"message": f"provider '{request.key}' 已添加"}
+    return {"message": f"provider '{request.key}' added"}
 
 
 @app.patch("/providers/{key}")
 async def update_provider(key: str, request: UpdateProviderRequest):
-    """部分更新 provider 配置。"""
+    """Partially update provider config."""
     existing_cfg = config_manager.get(f"providers.{key}")
     if not existing_cfg:
-        raise HTTPException(status_code=404, detail=f"provider '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"provider '{key}' not found")
 
     merged_cfg = dict(existing_cfg)
     if request.type is not None:
@@ -830,7 +830,7 @@ async def update_provider(key: str, request: UpdateProviderRequest):
         merged_cfg["model"] = request.model
     if request.memory_window is not None:
         if request.memory_window <= 0:
-            raise HTTPException(status_code=400, detail="memory_window 必须大于 0")
+            raise HTTPException(status_code=400, detail="memory_window must be greater than 0")
         merged_cfg["memory_window"] = request.memory_window
     if request.thinking is not None:
         merged_cfg["thinking"] = request.thinking
@@ -841,47 +841,47 @@ async def update_provider(key: str, request: UpdateProviderRequest):
     settings = merged_cfg.get("settings", {})
     _validate_provider_config(provider_type, settings)
     config_manager.set(f"providers.{key}", merged_cfg)
-    return {"message": f"provider '{key}' 已更新"}
+    return {"message": f"provider '{key}' updated"}
 
 
 @app.delete("/providers/{key}")
 async def delete_provider(key: str):
-    """删除 provider 配置；如果仍被 agent 引用则拒绝删除。"""
+    """Delete provider config; reject if still referenced by agents."""
     providers_cfg: dict = config_manager.get("providers", {})
     if key not in providers_cfg:
-        raise HTTPException(status_code=404, detail=f"provider '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"provider '{key}' not found")
 
     used_by = _get_provider_usages(key)
     if used_by:
         raise HTTPException(
             status_code=400,
             detail={
-                "message": f"provider '{key}' 正在被 agent 引用，无法删除",
+                "message": f"provider '{key}' is referenced by agents, cannot delete",
                 "used_by_agents": used_by,
             },
         )
 
     providers_cfg.pop(key, None)
     config_manager.set("providers", providers_cfg)
-    return {"message": f"provider '{key}' 已删除"}
+    return {"message": f"provider '{key}' deleted"}
 
 
 @app.post("/providers/{key}/test")
 async def test_provider(key: str):
-    """向 provider 发送一条极简消息以验证连通性。"""
+    """Send a minimal message to provider to verify connectivity."""
     cfg = config_manager.get(f"providers.{key}")
     if not cfg:
-        raise HTTPException(status_code=404, detail=f"provider '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"provider '{key}' not found")
 
     registry = _build_provider_registry()
     provider_type = cfg.get("type", key)
     info = registry.get(provider_type)
     if not info:
-        raise HTTPException(status_code=400, detail=f"不支持的 provider 类型: {provider_type}")
+        raise HTTPException(status_code=400, detail=f"Unsupported provider type: {provider_type}")
 
     model = cfg.get("model", "")
     if not model:
-        raise HTTPException(status_code=400, detail="provider 未配置 model")
+        raise HTTPException(status_code=400, detail="provider has no model configured")
 
     settings = cfg.get("settings", {})
     adapter = info.cls(**settings)
@@ -903,17 +903,17 @@ async def test_provider(key: str):
         return {"ok": False, "error": str(exc)}
 
 
-# ── Channel 管理端点 ──────────────────────────────────────────────────────────
+# ── Channel management endpoints ───────────────────────────────────────────────
 
 @app.get("/channels")
 async def list_channels():
-    """列出当前已注册的 channel 及其状态。"""
+    """List currently registered channels and their status."""
     return get_channel_manager().status()
 
 
 @app.get("/channels/config")
 async def get_channels_config():
-    """返回所有已配置的 channel 的详细信息（含 web），包括 settings、description、agent_name。"""
+    """Return all configured channels (including web) with settings, description, agent_name."""
     channels_cfg: dict = config_manager.get("channels", {})
     return {
         "channels": [
@@ -925,7 +925,7 @@ async def get_channels_config():
 
 @app.get("/channels/supported")
 async def get_supported_channels():
-    """返回所有可配置的 channel 类型（内置 builtin channel 如 web 被过滤）。"""
+    """Return all configurable channel types (builtin like web filtered out)."""
     registry = _build_registry()
     return {
         "supported": [
@@ -942,22 +942,33 @@ async def get_supported_channels():
 
 @app.get("/channels/{key}")
 async def get_channel_detail(key: str):
-    """返回单个 channel 实例详情。"""
+    """Return a single channel instance detail."""
     cfg = _require_channel(key)
     return _build_channel_entry(key, cfg)
 
 
+@app.get("/channels/{key}/qr")
+async def get_channel_qr(key: str):
+    """Return QR code string for WhatsApp channel (WhatsApp type only)."""
+    _require_channel(key)
+    ch = get_channel_manager().get(key)
+    if ch is None:
+        raise HTTPException(status_code=404, detail="channel not running")
+    qr = getattr(ch, "_qr_code", None)
+    return {"qr": qr}
+
+
 @app.post("/channels")
 async def add_channel(request: AddChannelRequest):
-    """写入 config 并启动一个新 channel 实例。builtin 类型（如 web）不允许添加。"""
+    """Write config and start a new channel instance. Builtin types (e.g. web) cannot be added."""
     registry = _build_registry()
     info = registry.get(request.type)
     if info is None:
-        raise HTTPException(status_code=400, detail=f"不支持的 channel 类型: {request.type}")
+        raise HTTPException(status_code=400, detail=f"Unsupported channel type: {request.type}")
     if info.builtin:
-        raise HTTPException(status_code=400, detail=f"channel 类型 '{request.type}' 为内置类型，不可通过 API 添加")
+        raise HTTPException(status_code=400, detail=f"channel type '{request.type}' is builtin, cannot add via API")
     if request.key in get_channel_manager()._channels:
-        raise HTTPException(status_code=400, detail=f"channel '{request.key}' 已存在")
+        raise HTTPException(status_code=400, detail=f"channel '{request.key}' already exists")
 
     cfg = {
         "type": request.type,
@@ -968,18 +979,18 @@ async def add_channel(request: AddChannelRequest):
     }
     config_manager.set(f"channels.{request.key}", cfg)
     await get_channel_manager()._start_channel(request.key, info, cfg)
-    return {"message": f"channel '{request.key}' 已添加并启动"}
+    return {"message": f"channel '{request.key}' added and started"}
 
 
 @app.patch("/channels/{key}")
 async def update_channel(key: str, request: UpdateChannelRequest):
-    """部分更新 channel 配置，并在运行中时重启该 channel 使配置生效。"""
+    """Partially update channel config and restart channel when running to apply."""
     existing_cfg = _require_channel(key)
     channel_type = existing_cfg.get("type", key)
     registry = _build_registry()
     info = registry.get(channel_type)
     if info is None:
-        raise HTTPException(status_code=400, detail=f"不支持的 channel 类型: {channel_type}")
+        raise HTTPException(status_code=400, detail=f"Unsupported channel type: {channel_type}")
 
     merged_cfg = dict(existing_cfg)
     if request.agent_name is not None:
@@ -996,37 +1007,37 @@ async def update_channel(key: str, request: UpdateChannelRequest):
     if get_channel_manager().get(key) is not None:
         await get_channel_manager()._stop_channel(key)
         await get_channel_manager()._start_channel(key, info, merged_cfg)
-    return {"message": f"channel '{key}' 已更新"}
+    return {"message": f"channel '{key}' updated"}
 
 
 @app.delete("/channels/{key}")
 async def delete_channel(key: str):
-    """停止并移除一个 channel 实例。内置 channel（如 web）不允许删除。"""
+    """Stop and remove a channel instance. Builtin channels (e.g. web) cannot be deleted."""
     registry = _build_registry()
     channel = get_channel_manager().get(key)
     if channel is None:
-        raise HTTPException(status_code=404, detail=f"channel '{key}' 不存在")
+        raise HTTPException(status_code=404, detail=f"channel '{key}' not found")
 
     channel_type = config_manager.get(f"channels.{key}.type", key)
     info = registry.get(channel_type)
     if info and info.builtin:
-        raise HTTPException(status_code=400, detail=f"channel '{key}' 为内置 channel，不可删除")
+        raise HTTPException(status_code=400, detail=f"channel '{key}' is builtin, cannot delete")
 
     await get_channel_manager()._stop_channel(key)
     cfg = config_manager.get("channels", {})
     cfg.pop(key, None)
     config_manager.set("channels", cfg)
-    return {"message": f"channel '{key}' 已停止并移除"}
+    return {"message": f"channel '{key}' stopped and removed"}
 
 
 BUILTIN_AGENTS = {"main"}
 
 
-# ── Agent 管理端点 ─────────────────────────────────────────────────────────────
+# ── Agent management endpoints ─────────────────────────────────────────────────
 
 @app.get("/agents")
 async def list_agents():
-    """返回所有已配置的 agent 及其配置。"""
+    """Return all configured agents and their config."""
     agents_cfg: dict = config_manager.get("agents", {})
     return {
         "agents": [
@@ -1038,18 +1049,18 @@ async def list_agents():
 
 @app.get("/agents/{name}")
 async def get_agent_detail(name: str):
-    """返回单个 agent 的详情。"""
+    """Return a single agent detail."""
     cfg = _require_agent(name)
     return _build_agent_entry(name, cfg)
 
 
 @app.post("/agents")
 async def add_agent(request: AddAgentRequest):
-    """创建新 agent：复制 template 并写入 config。"""
+    """Create new agent: copy template and write config."""
     import shutil
     global heartbeat_manager
     if config_manager.get(f"agents.{request.name}"):
-        raise HTTPException(status_code=400, detail=f"agent '{request.name}' 已存在")
+        raise HTTPException(status_code=400, detail=f"agent '{request.name}' already exists")
 
     _validate_agent_provider(request.provider)
 
@@ -1077,12 +1088,12 @@ async def add_agent(request: AddAgentRequest):
     _ensure_agent_heartbeat_file(request.name)
     if heartbeat_manager is not None:
         await heartbeat_manager.rebuild_agent(request.name)
-    return {"message": f"agent '{request.name}' 已创建"}
+    return {"message": f"agent '{request.name}' created"}
 
 
 @app.patch("/agents/{name}")
 async def update_agent(name: str, request: UpdateAgentRequest):
-    """部分更新 agent 配置。"""
+    """Partially update agent config."""
     existing_cfg = _require_agent(name)
     merged_cfg = dict(existing_cfg)
 
@@ -1097,12 +1108,12 @@ async def update_agent(name: str, request: UpdateAgentRequest):
         merged_cfg["emoji"] = request.emoji
 
     config_manager.set(f"agents.{name}", merged_cfg)
-    return {"message": f"agent '{name}' 已更新"}
+    return {"message": f"agent '{name}' updated"}
 
 
 @app.post("/agents/{name}/reset")
 async def reset_agent(name: str):
-    """重置 agent 工作区：删除目录内容，从 template 重新复制，重置 bootstrap 状态。"""
+    """Reset agent workspace: clear dir, copy from template again, reset bootstrap state."""
     import shutil
     global heartbeat_manager
     _require_agent(name)
@@ -1128,25 +1139,25 @@ async def reset_agent(name: str):
     if heartbeat_manager is not None:
         await heartbeat_manager.rebuild_agent(name)
 
-    return {"message": f"agent '{name}' 工作区已重置"}
+    return {"message": f"agent '{name}' workspace reset"}
 
 
 @app.delete("/agents/{name}")
 async def delete_agent(name: str):
-    """删除 agent（移除 config 并删除 workspace 目录）。内置 agent 不可删除。"""
+    """Delete agent (remove config and workspace dir). Builtin agents cannot be deleted."""
     import shutil
     global heartbeat_manager
     if name in BUILTIN_AGENTS:
-        raise HTTPException(status_code=400, detail=f"agent '{name}' 为内置 agent，不可删除")
+        raise HTTPException(status_code=400, detail=f"agent '{name}' is builtin, cannot delete")
     if not config_manager.get(f"agents.{name}"):
-        raise HTTPException(status_code=404, detail=f"agent '{name}' 不存在")
+        raise HTTPException(status_code=404, detail=f"agent '{name}' not found")
 
     used_by = _get_agent_usages(name)
     if used_by:
         raise HTTPException(
             status_code=400,
             detail={
-                "message": f"agent '{name}' 正在被 channel 引用，无法删除",
+                "message": f"agent '{name}' is referenced by channels, cannot delete",
                 "used_by_channels": used_by,
             },
         )
@@ -1166,7 +1177,7 @@ async def delete_agent(name: str):
     agents_cfg = config_manager.get("agents", {})
     agents_cfg.pop(name, None)
     config_manager.set("agents", agents_cfg)
-    return {"message": f"agent '{name}' 已删除"}
+    return {"message": f"agent '{name}' deleted"}
 
 
 # ── Agent Workspace Files ──────────────────────────────────────────────────────
@@ -1176,7 +1187,7 @@ EDITABLE_AGENT_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "BOOTSTRA
 
 @app.get("/agents/{name}/files")
 async def list_agent_files(name: str):
-    """列出 agent workspace 下可编辑的 md 文件。"""
+    """List editable md files under agent workspace."""
     _require_agent(name)
     agent_dir = WORKSPACE_DIR / "agents" / name
     if not agent_dir.exists():
@@ -1190,30 +1201,30 @@ async def list_agent_files(name: str):
 
 @app.get("/agents/{name}/files/{filename}")
 async def read_agent_file(name: str, filename: str):
-    """读取 agent workspace 下的单个 md 文件内容。"""
+    """Read a single md file under agent workspace."""
     _require_agent(name)
     if filename not in EDITABLE_AGENT_FILES:
-        raise HTTPException(status_code=400, detail=f"不可读取的文件: {filename}")
+        raise HTTPException(status_code=400, detail=f"File not readable: {filename}")
     file_path = WORKSPACE_DIR / "agents" / name / filename
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"文件 '{filename}' 不存在")
+        raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
     content = file_path.read_text(encoding="utf-8")
     return {"filename": filename, "content": content}
 
 
 @app.put("/agents/{name}/files/{filename}")
 async def write_agent_file(name: str, filename: str, body: WriteFileRequest):
-    """写入 agent workspace 下的单个 md 文件。"""
+    """Write a single md file under agent workspace."""
     _require_agent(name)
     if filename not in EDITABLE_AGENT_FILES:
-        raise HTTPException(status_code=400, detail=f"不可编辑的文件: {filename}")
+        raise HTTPException(status_code=400, detail=f"File not editable: {filename}")
     file_path = WORKSPACE_DIR / "agents" / name / filename
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(body.content, encoding="utf-8")
-    return {"message": f"文件 '{filename}' 已保存"}
+    return {"message": f"File '{filename}' saved"}
 
 
-# ── Skills 管理端点 ────────────────────────────────────────────────────────────
+# ── Skills management endpoints ───────────────────────────────────────────────
 
 
 def _build_skill_entry(
@@ -1242,10 +1253,10 @@ async def list_skills(
     agent_name: str = "main",
 ):
     """
-    列出技能。
-    - scope 为空：返回 builtin + 指定 agent 的 workspace skills
-    - scope=builtin：仅返回公共技能
-    - scope=workspace：仅返回指定 agent 的技能
+    List skills.
+    - scope empty: return builtin + specified agent's workspace skills
+    - scope=builtin: builtin skills only
+    - scope=workspace: specified agent's skills only
     """
     results: list[dict] = []
 
@@ -1282,7 +1293,7 @@ async def get_skill_detail(
     scope: str | None = None,
     agent_name: str = "main",
 ):
-    """返回单个技能的详情（含 SKILL.md 内容）。"""
+    """Return a single skill detail (including SKILL.md content)."""
     loader = get_skills_loader(agent_name)
 
     if scope == "workspace":
@@ -1295,7 +1306,7 @@ async def get_skill_detail(
         skill_file = ws_file if ws_file.exists() else bi_file
 
     if not skill_file.exists():
-        raise HTTPException(status_code=404, detail=f"技能 '{name}' 不存在")
+        raise HTTPException(status_code=404, detail=f"Skill '{name}' not found")
 
     source = "workspace" if "agents" in str(skill_file) else "builtin"
     content = skill_file.read_text(encoding="utf-8")
@@ -1323,20 +1334,20 @@ async def upload_skill(
     agent_name: str = Form("main"),
 ):
     """
-    上传 zip 技能包并解压到目标目录。
+    Upload zip skill package and extract to target dir.
     scope: "builtin" | "workspace"
-    agent_name: 当 scope=workspace 时指定目标 agent
+    agent_name: target agent when scope=workspace
     """
     if scope not in ("builtin", "workspace"):
-        raise HTTPException(status_code=400, detail="scope 必须为 'builtin' 或 'workspace'")
+        raise HTTPException(status_code=400, detail="scope must be 'builtin' or 'workspace'")
 
     if not file.filename or not file.filename.endswith(".zip"):
-        raise HTTPException(status_code=400, detail="请上传 .zip 格式的文件")
+        raise HTTPException(status_code=400, detail="Please upload a .zip file")
 
     MAX_SIZE = 50 * 1024 * 1024  # 50 MB
     zip_bytes = await file.read()
     if len(zip_bytes) > MAX_SIZE:
-        raise HTTPException(status_code=400, detail="文件大小超过 50 MB 限制")
+        raise HTTPException(status_code=400, detail="File size exceeds 50 MB limit")
 
     target_dir = resolve_skills_dir(scope, agent_name)
 
@@ -1348,7 +1359,7 @@ async def upload_skill(
         raise HTTPException(status_code=400, detail=str(e))
 
     return {
-        "message": f"技能 '{skill_name}' 已安装",
+        "message": f"Skill '{skill_name}' installed",
         "name": skill_name,
         "scope": scope,
         "agent_name": agent_name if scope == "workspace" else None,
@@ -1362,9 +1373,9 @@ async def delete_skill(
     scope: str = "builtin",
     agent_name: str = "main",
 ):
-    """删除指定技能文件夹。"""
+    """Delete the specified skill folder."""
     if scope not in ("builtin", "workspace"):
-        raise HTTPException(status_code=400, detail="scope 必须为 'builtin' 或 'workspace'")
+        raise HTTPException(status_code=400, detail="scope must be 'builtin' or 'workspace'")
 
     target_dir = resolve_skills_dir(scope, agent_name)
 
@@ -1374,7 +1385,7 @@ async def delete_skill(
         raise HTTPException(status_code=404, detail=str(e))
 
     return {
-        "message": f"技能 '{name}' 已删除",
+        "message": f"Skill '{name}' deleted",
         "scope": scope,
         "agent_name": agent_name if scope == "workspace" else None,
     }
@@ -1383,29 +1394,29 @@ async def delete_skill(
 @app.post("/channels/reload")
 async def reload_channels():
     """
-    对比 config 与运行中的 channel，增量更新：
-    - config 中新增的 channel → start()
-    - config 中已移除的 channel → stop()
-    - 两边都有的 → 保持不变（不重启，避免断连）
+    Compare config with running channels, incremental update:
+    - new in config → start()
+    - removed from config → stop()
+    - in both → unchanged (no restart to avoid disconnect)
     """
     result = await get_channel_manager().reload()
     return result
 
 
-# ── 消息端点 ──────────────────────────────────────────────────────────────────
+# ── Message endpoints ──────────────────────────────────────────────────────────
 
 
 @app.post("/chat/session")
 async def create_chat_session(request: CreateChatSessionRequest):
-    """创建新的 web chat session，返回 session_id 与当前绑定 agent。"""
+    """Create a new web chat session, return session_id and bound agent."""
     if request.channel != "web":
-        raise HTTPException(status_code=400, detail="当前仅支持为 web channel 创建 chat session")
+        raise HTTPException(status_code=400, detail="Only web channel chat session creation is supported")
 
     chat_id = request.chat_id or uuid4().hex[:8]
     session_id = f"{request.channel}@{chat_id}"
     agent_name = config_manager.get(f"channels.{request.channel}.agent_name", "main")
 
-    # 在创建会话时立即落盘空 session，避免刷新前端后列表丢失未发首条消息的会话。
+    # Persist empty session on create so list is not lost after refresh before first message.
     Session(session_id)
 
     return {
@@ -1418,29 +1429,29 @@ async def create_chat_session(request: CreateChatSessionRequest):
 
 @app.get("/chat/events/schema")
 async def get_chat_events_schema():
-    """返回 web chat SSE 事件协议说明。"""
+    """Return web chat SSE event protocol description."""
     return {
         "transport": "sse",
         "endpoint": "/chat",
         "events": [
             {
                 "event": EventType.THINKING.value,
-                "description": "LLM 思考过程",
+                "description": "LLM thinking process",
                 "data_schema": {"content": "string"},
             },
             {
                 "event": EventType.TOOL_CALL.value,
-                "description": "工具调用开始",
+                "description": "Tool call started",
                 "data_schema": {"tool_name": "string", "args": "object"},
             },
             {
                 "event": EventType.TOOL_RESULT.value,
-                "description": "工具调用结果",
+                "description": "Tool call result",
                 "data_schema": {"tool_name": "string", "result": "string"},
             },
             {
                 "event": EventType.FINAL.value,
-                "description": "最终回复",
+                "description": "Final reply",
                 "data_schema": {"content": "string"},
             },
         ],
@@ -1449,7 +1460,7 @@ async def get_chat_events_schema():
 
 @app.get("/system/status")
 async def get_system_status():
-    """返回前端首页和状态栏可直接消费的系统状态。"""
+    """Return system status for frontend home and status bar."""
     loaded_mcp_tools = []
     if agent_loop:
         loaded_mcp_tools = [
@@ -1475,7 +1486,7 @@ async def get_system_status():
 
 @app.get("/resources/summary")
 async def get_resources_summary():
-    """返回 Web 控制台首页可用的资源统计摘要。"""
+    """Return resource summary for Web console home."""
     return {
         "agents_count": len(config_manager.get("agents", {})),
         "channels_count": len(config_manager.get("channels", {})),
@@ -1491,13 +1502,13 @@ async def list_sessions_v2(
     agent_name: str | None = None,
 ) -> dict:
     """
-    列出所有 sessions，支持按 channel 或 agent 分组。
+    List all sessions, optionally grouped by channel or agent.
     - group_by: "channel" | "agent"
-    - channel: 可选，按 channel 过滤
-    - agent_name: 可选，按 agent 过滤
+    - channel: optional filter by channel
+    - agent_name: optional filter by agent
     """
     if group_by not in ("channel", "agent"):
-        raise HTTPException(status_code=400, detail="group_by 必须为 'channel' 或 'agent'")
+        raise HTTPException(status_code=400, detail="group_by must be 'channel' or 'agent'")
 
     agents_dir = WORKSPACE_DIR / "agents"
     groups: dict[str, list[dict]] = {}
@@ -1550,10 +1561,10 @@ async def list_sessions(channel: str) -> dict:
 
 @app.get("/get-session")
 async def get_session(channel: str, session_id: str) -> dict:
-    """根据 channel 和 session_id 读取聊天记录。"""
+    """Read chat history by channel and session_id."""
     agent_name, session_file = _get_session_file(channel, session_id)
     if not session_file.exists():
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' 不存在")
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     data = json.loads(session_file.read_text(encoding="utf-8"))
     messages = data.get("messages", data) if isinstance(data, dict) else data
     return {
@@ -1565,14 +1576,14 @@ async def get_session(channel: str, session_id: str) -> dict:
 
 @app.delete("/delete-session")
 async def delete_session(channel: str, session_id: str) -> dict:
-    """根据 channel 和 session_id 删除会话文件。"""
+    """Delete session file by channel and session_id."""
     agent_name, session_file = _get_session_file(channel, session_id)
     if not session_file.exists():
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' 不存在")
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
     session_file.unlink()
     return {
-        "message": f"Session '{session_id}' 已删除",
+        "message": f"Session '{session_id}' deleted",
         "agent_name": agent_name,
         "session_id": session_id,
     }
@@ -1592,12 +1603,12 @@ async def send_message(request: SendMessageRequest):
 
 @app.post("/chat")
 async def chat(request: SendMessageRequest):
-    """SSE 端点：发送消息并通过流式返回多轮反馈（仅适用于 web channel）。"""
+    """SSE endpoint: send message and stream multi-turn feedback (web channel only)."""
     session_id = request.session_id
 
     web_channel = get_channel_manager().get("web")
     if not isinstance(web_channel, WebChannel):
-        raise HTTPException(status_code=503, detail="web channel 未启动")
+        raise HTTPException(status_code=503, detail="web channel not started")
 
     queue = await web_channel.subscribe(session_id)
     await web_channel.receive(
@@ -1623,7 +1634,7 @@ async def chat(request: SendMessageRequest):
     )
 
 
-# 挂载前端静态文件（仅当 dist 目录存在时生效，不影响本地开发）
+# Mount frontend static files (only when dist exists; does not affect local dev)
 _dist_dir = Path(__file__).resolve().parent.parent.parent / "aurogen_web" / "dist"
 if _dist_dir.exists():
     app.mount("/", StaticFiles(directory=_dist_dir, html=True), name="static")

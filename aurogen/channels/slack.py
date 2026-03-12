@@ -39,13 +39,13 @@ class SlackChannel(BaseChannel):
     settings:
         bot_token        : Slack Bot Token (xoxb-...)
         app_token        : Slack App-Level Token (xapp-...)
-        reply_in_thread  : 是否在线程中回复 (default: true)
-        react_emoji      : 收到消息后添加的表情反应 (default: "eyes")
-        dm_enabled       : 是否启用 DM (default: true)
-        dm_policy        : DM 策略 "open" | "allowlist" (default: "open")
-        dm_allow_from    : DM 白名单用户 ID 列表 (default: [])
-        group_policy     : 群组策略 "open" | "mention" | "allowlist" (default: "mention")
-        group_allow_from : 群组白名单 channel ID 列表 (default: [])
+        reply_in_thread  : Whether to reply in thread (default: true)
+        react_emoji      : Emoji reaction to add after receiving a message (default: "eyes")
+        dm_enabled       : Whether to enable DM (default: true)
+        dm_policy        : DM policy "open" | "allowlist" (default: "open")
+        dm_allow_from    : List of user IDs in DM allowlist (default: [])
+        group_policy     : Channel policy "open" | "mention" | "allowlist" (default: "mention")
+        group_allow_from : List of channel IDs in channel allowlist (default: [])
     """
 
     _TABLE_RE = re.compile(r"(?m)^\|.*\|$(?:\n\|[\s:|-]*\|$)(?:\n\|.*\|$)*")
@@ -73,11 +73,11 @@ class SlackChannel(BaseChannel):
 
     async def start(self) -> None:
         if not SLACK_SDK_AVAILABLE:
-            logger.error("[{}] slack-sdk 未安装，运行: pip install slack-sdk", self.name)
+            logger.error("[{}] slack-sdk not installed, run: pip install slack-sdk", self.name)
             return
 
         if not self._bot_token or not self._app_token:
-            logger.error("[{}] bot_token 或 app_token 未配置", self.name)
+            logger.error("[{}] bot_token or app_token not configured", self.name)
             return
 
         self._running = True
@@ -91,13 +91,13 @@ class SlackChannel(BaseChannel):
         try:
             auth = await self._web_client.auth_test()
             self._bot_user_id = auth.get("user_id")
-            logger.info("[{}] Slack bot 已连接: {}", self.name, self._bot_user_id)
+            logger.info("[{}] Slack bot connected: {}", self.name, self._bot_user_id)
         except Exception as e:
-            logger.warning("[{}] Slack auth_test 失败: {}", self.name, e)
+            logger.warning("[{}] Slack auth_test failed: {}", self.name, e)
 
         await self._socket_client.connect()
         self._main_task = asyncio.create_task(self._run_main())
-        logger.info("[{}] Slack channel 已启动（Socket Mode）", self.name)
+        logger.info("[{}] Slack channel started (Socket Mode)", self.name)
 
     async def _run_main(self) -> None:
         while self._running:
@@ -115,15 +115,15 @@ class SlackChannel(BaseChannel):
             try:
                 await self._socket_client.close()
             except Exception as e:
-                logger.warning("[{}] Slack socket 关闭失败: {}", self.name, e)
+                logger.warning("[{}] Slack socket close failed: {}", self.name, e)
             self._socket_client = None
-        logger.info("[{}] Slack channel 已停止", self.name)
+        logger.info("[{}] Slack channel stopped", self.name)
 
-    # ── 出站：发送消息 ────────────────────────────────────────────────────────
+    # ── Outbound: send message ─────────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
         if not self._web_client:
-            logger.warning("[{}] Slack 客户端未初始化", self.name)
+            logger.warning("[{}] Slack client not initialized", self.name)
             return
         if not content or not content.strip():
             return
@@ -139,9 +139,9 @@ class SlackChannel(BaseChannel):
                 thread_ts=thread_ts if use_thread else None,
             )
         except Exception as e:
-            logger.error("[{}] 发送 Slack 消息失败: {}", self.name, e)
+            logger.error("[{}] Failed to send Slack message: {}", self.name, e)
 
-    # ── 入站：Socket Mode 事件处理 ────────────────────────────────────────────
+    # ── Inbound: Socket Mode event handling ────────────────────────────────────
 
     async def _on_socket_request(
         self,
@@ -217,7 +217,7 @@ class SlackChannel(BaseChannel):
             },
         ))
 
-    # ── 访问控制 ──────────────────────────────────────────────────────────────
+    # ── Access control ────────────────────────────────────────────────────────
 
     def _is_allowed(self, sender_id: str, chat_id: str, channel_type: str) -> bool:
         if channel_type == "im":
@@ -247,7 +247,7 @@ class SlackChannel(BaseChannel):
             return text
         return re.sub(rf"<@{re.escape(self._bot_user_id)}>\s*", "", text).strip()
 
-    # ── Markdown -> Slack mrkdwn 转换 ─────────────────────────────────────────
+    # ── Markdown -> Slack mrkdwn conversion ───────────────────────────────────
 
     @classmethod
     def _to_mrkdwn(cls, text: str) -> str:

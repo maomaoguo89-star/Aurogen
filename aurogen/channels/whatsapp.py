@@ -1,9 +1,10 @@
-"""WhatsApp channel：通过 Node.js Bridge 子进程收发 WhatsApp 消息。"""
+"""WhatsApp channel: send/receive WhatsApp messages via Node.js Bridge subprocess."""
 
 import asyncio
 import json
 import os
-import signal
+import subprocess
+import sys
 from pathlib import Path
 
 from loguru import logger
@@ -25,16 +26,16 @@ except ImportError:
 
 class WhatsAppChannel(BaseChannel):
     """
-    WhatsApp channel，通过 Node.js Bridge 收发消息。
+    WhatsApp channel; sends/receives messages via Node.js Bridge.
 
-    Bridge 使用 @whiskeysockets/baileys 处理 WhatsApp Web 协议，
-    Python 端通过 WebSocket 与 Bridge 双向通信。
-    start() 会自动拉起 Bridge 子进程，stop() 时自动终止。
+    Bridge uses @whiskeysockets/baileys for WhatsApp Web protocol.
+    Python talks to Bridge over WebSocket (bidirectional).
+    start() spawns the Bridge subprocess; stop() terminates it.
 
     settings:
-        bridge_port  : Bridge WebSocket 端口（默认 3001）
-        bridge_token : 可选认证 token
-        auth_dir     : Baileys 认证目录（默认 ~/.aurogen/whatsapp-auth）
+        bridge_port  : Bridge WebSocket port (default 3001)
+        bridge_token : Optional auth token
+        auth_dir     : Baileys auth directory (default ~/.aurogen/whatsapp-auth)
     """
 
     def __init__(self, channel_key: str, settings: dict):
@@ -49,19 +50,20 @@ class WhatsAppChannel(BaseChannel):
         self._ws = None
         self._connected = False
         self._running = False
-        self._bridge_proc: asyncio.subprocess.Process | None = None
+        self._bridge_proc: subprocess.Popen | None = None
         self._listen_task: asyncio.Task | None = None
+        self._qr_code: str | None = None
 
-    # ── 生命周期 ──────────────────────────────────────────────────────────────
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
         if not WS_AVAILABLE:
-            logger.error("[{}] websockets 未安装，运行: pip install websockets", self.name)
+            logger.error("[{}] websockets not installed, run: pip install websockets", self.name)
             return
 
         if not BRIDGE_ENTRY.exists():
             logger.error(
-                "[{}] Bridge 未构建，找不到 {}。请先在 channels/bridge/ 下执行 npm run build",
+                "[{}] Bridge not built, {} not found. Run npm run build in channels/bridge/ first",
                 self.name, BRIDGE_ENTRY,
             )
             return
@@ -88,31 +90,32 @@ class WhatsAppChannel(BaseChannel):
 
         await self._stop_bridge()
 
-    # ── 出站 ──────────────────────────────────────────────────────────────────
+    # ── Outbound ──────────────────────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
         if not self._ws or not self._connected:
-            logger.warning("[{}] Bridge 未连接，消息丢弃", self.name)
+            logger.warning("[{}] Bridge not connected, message dropped", self.name)
             return
         try:
             payload = {"type": "send", "to": chat_id, "text": content}
             await self._ws.send(json.dumps(payload, ensure_ascii=False))
         except Exception as e:
-            logger.error("[{}] 发送消息失败: {}", self.name, e)
+            logger.error("[{}] Failed to send message: {}", self.name, e)
 
-    # ── Bridge 子进程管理 ─────────────────────────────────────────────────────
+    # ── Bridge subprocess management ──────────────────────────────────────────
 
     async def _start_bridge(self) -> None:
         env = {**os.environ, "BRIDGE_PORT": str(self._bridge_port), "AUTH_DIR": self._auth_dir}
         if self._bridge_token:
             env["BRIDGE_TOKEN"] = self._bridge_token
 
-        logger.info("[{}] 启动 Bridge 子进程 (port={})...", self.name, self._bridge_port)
-        self._bridge_proc = await asyncio.create_subprocess_exec(
-            "node", str(BRIDGE_ENTRY),
+        node_cmd = "node.exe" if sys.platform == "win32" else "node"
+        logger.info("[{}] Starting Bridge subprocess (port={})...", self.name, self._bridge_port)
+        self._bridge_proc = subprocess.Popen(
+            [node_cmd, str(BRIDGE_ENTRY)],
             env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         asyncio.create_task(self._pipe_bridge_logs())
         await asyncio.sleep(2)
@@ -123,44 +126,41 @@ class WhatsAppChannel(BaseChannel):
             return
         self._bridge_proc = None
         try:
-            proc.send_signal(signal.SIGTERM)
+            proc.terminate()
             try:
-                await asyncio.wait_for(proc.wait(), timeout=5)
-            except asyncio.TimeoutError:
+                await asyncio.to_thread(proc.wait, timeout=5)
+            except subprocess.TimeoutExpired:
                 proc.kill()
-                await proc.wait()
-            logger.info("[{}] Bridge 子进程已终止", self.name)
+                await asyncio.to_thread(proc.wait)
+            logger.info("[{}] Bridge subprocess terminated", self.name)
         except ProcessLookupError:
             pass
 
     async def _pipe_bridge_logs(self) -> None:
-        """将 Bridge 子进程的 stdout/stderr 转发到 loguru。"""
+        """Forward Bridge subprocess stdout/stderr to loguru."""
         proc = self._bridge_proc
         if proc is None:
             return
 
-        async def _read_stream(stream, level: str):
-            while True:
-                line = await stream.readline()
-                if not line:
-                    break
-                text = line.decode(errors="replace").rstrip()
+        def _read_stream(stream, level: str) -> None:
+            for raw_line in stream:
+                text = raw_line.decode(errors="replace").rstrip()
                 if text:
                     logger.log(level, "[{}/bridge] {}", self.name, text)
 
         tasks = []
         if proc.stdout:
-            tasks.append(asyncio.create_task(_read_stream(proc.stdout, "INFO")))
+            tasks.append(asyncio.to_thread(_read_stream, proc.stdout, "INFO"))
         if proc.stderr:
-            tasks.append(asyncio.create_task(_read_stream(proc.stderr, "WARNING")))
+            tasks.append(asyncio.to_thread(_read_stream, proc.stderr, "WARNING"))
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    # ── WebSocket 监听循环 ────────────────────────────────────────────────────
+    # ── WebSocket listen loop ─────────────────────────────────────────────────
 
     async def _ws_loop(self) -> None:
         bridge_url = f"ws://127.0.0.1:{self._bridge_port}"
-        logger.info("[{}] 连接 Bridge WebSocket {}...", self.name, bridge_url)
+        logger.info("[{}] Connecting to Bridge WebSocket {}...", self.name, bridge_url)
 
         while self._running:
             try:
@@ -169,13 +169,13 @@ class WhatsAppChannel(BaseChannel):
                     if self._bridge_token:
                         await ws.send(json.dumps({"type": "auth", "token": self._bridge_token}))
                     self._connected = True
-                    logger.info("[{}] 已连接 Bridge", self.name)
+                    logger.info("[{}] Connected to Bridge", self.name)
 
                     async for raw in ws:
                         try:
                             await self._handle_bridge_message(raw)
                         except Exception as e:
-                            logger.error("[{}] 处理 bridge 消息出错: {}", self.name, e)
+                            logger.error("[{}] Error handling bridge message: {}", self.name, e)
 
             except asyncio.CancelledError:
                 break
@@ -183,16 +183,16 @@ class WhatsAppChannel(BaseChannel):
                 self._connected = False
                 self._ws = None
                 if self._running:
-                    logger.warning("[{}] Bridge 连接断开: {}，5 秒后重连...", self.name, e)
+                    logger.warning("[{}] Bridge connection lost: {}, reconnecting in 5s...", self.name, e)
                     await asyncio.sleep(5)
 
-    # ── 入站消息处理 ──────────────────────────────────────────────────────────
+    # ── Inbound message handling ─────────────────────────────────────────────
 
     async def _handle_bridge_message(self, raw: str) -> None:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
-            logger.warning("[{}] 无效 JSON: {}", self.name, raw[:100])
+            logger.warning("[{}] Invalid JSON: {}", self.name, raw[:100])
             return
 
         msg_type = data.get("type")
@@ -204,10 +204,10 @@ class WhatsAppChannel(BaseChannel):
 
             user_id = pn if pn else sender
             sender_id = user_id.split("@")[0] if "@" in user_id else user_id
-            logger.info("[{}] 收到消息 sender={}", self.name, sender_id)
+            logger.info("[{}] Received message sender={}", self.name, sender_id)
 
             if content == "[Voice Message]":
-                content = "[语音消息：WhatsApp 暂不支持转写]"
+                content = "[Voice message: transcription not supported by WhatsApp]"
 
             session_id = f"{self.name}@{sender}"
             await get_inbound_queue().put(InboundMessage(
@@ -222,14 +222,16 @@ class WhatsAppChannel(BaseChannel):
 
         elif msg_type == "status":
             status = data.get("status")
-            logger.info("[{}] WhatsApp 状态: {}", self.name, status)
+            logger.info("[{}] WhatsApp status: {}", self.name, status)
             if status == "connected":
                 self._connected = True
+                self._qr_code = None
             elif status == "disconnected":
                 self._connected = False
 
         elif msg_type == "qr":
-            logger.info("[{}] 请在 Bridge 终端扫描 QR 码连接 WhatsApp", self.name)
+            self._qr_code = data.get("qr", "")
+            logger.info("[{}] Received WhatsApp QR code, please scan via web panel to connect", self.name)
 
         elif msg_type == "error":
-            logger.error("[{}] Bridge 错误: {}", self.name, data.get("error"))
+            logger.error("[{}] Bridge error: {}", self.name, data.get("error"))

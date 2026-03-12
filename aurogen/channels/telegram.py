@@ -93,7 +93,7 @@ class TelegramChannel(BaseChannel):
     settings:
         token            : Telegram Bot Token
         proxy            : SOCKS5/HTTP proxy URL (optional)
-        reply_to_message : 是否引用回复原消息 (default: true)
+        reply_to_message : Whether to reply to the original message (default: true)
     """
 
     BOT_COMMANDS: list | None = None
@@ -118,14 +118,14 @@ class TelegramChannel(BaseChannel):
                 BotCommand("help", "Show available commands"),
             ]
 
-    # ── 生命周期 ──────────────────────────────────────────────────────────────
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
         if not TELEGRAM_AVAILABLE:
-            logger.error("[{}] python-telegram-bot 未安装，运行: pip install python-telegram-bot", self.name)
+            logger.error("[{}] python-telegram-bot not installed, run: pip install python-telegram-bot", self.name)
             return
         if not self._token:
-            logger.error("[{}] Telegram bot token 未配置", self.name)
+            logger.error("[{}] Telegram bot token not configured", self.name)
             return
 
         self._running = True
@@ -148,19 +148,19 @@ class TelegramChannel(BaseChannel):
             )
         )
 
-        logger.info("[{}] Telegram bot 启动中（polling 模式）...", self.name)
+        logger.info("[{}] Telegram bot starting (polling mode)...", self.name)
 
         await self._app.initialize()
         await self._app.start()
 
         bot_info = await self._app.bot.get_me()
-        logger.info("[{}] Telegram bot @{} 已连接", self.name, bot_info.username)
+        logger.info("[{}] Telegram bot @{} connected", self.name, bot_info.username)
 
         try:
             if self.BOT_COMMANDS:
                 await self._app.bot.set_my_commands(self.BOT_COMMANDS)
         except Exception as e:
-            logger.warning("[{}] 注册 bot commands 失败: {}", self.name, e)
+            logger.warning("[{}] Failed to register bot commands: {}", self.name, e)
 
         await self._app.updater.start_polling(
             allowed_updates=["message"],
@@ -168,7 +168,7 @@ class TelegramChannel(BaseChannel):
         )
 
         self._main_task = asyncio.create_task(self._run_main())
-        logger.info("[{}] Telegram channel 已启动", self.name)
+        logger.info("[{}] Telegram channel started", self.name)
 
     async def _run_main(self) -> None:
         while self._running:
@@ -188,22 +188,22 @@ class TelegramChannel(BaseChannel):
                 pass
 
         if self._app:
-            logger.info("[{}] Telegram bot 停止中...", self.name)
+            logger.info("[{}] Telegram bot stopping...", self.name)
             try:
                 await self._app.updater.stop()
                 await self._app.stop()
                 await self._app.shutdown()
             except Exception as e:
-                logger.warning("[{}] Telegram bot 关闭异常: {}", self.name, e)
+                logger.warning("[{}] Telegram bot shutdown error: {}", self.name, e)
             self._app = None
 
-        logger.info("[{}] Telegram channel 已停止", self.name)
+        logger.info("[{}] Telegram channel stopped", self.name)
 
-    # ── 出站：发送消息 ────────────────────────────────────────────────────────
+    # ── Outbound: send message ───────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
         if not self._app:
-            logger.warning("[{}] Telegram bot 未运行", self.name)
+            logger.warning("[{}] Telegram bot not running", self.name)
             return
 
         self._stop_typing(chat_id)
@@ -211,7 +211,7 @@ class TelegramChannel(BaseChannel):
         try:
             int_chat_id = int(chat_id)
         except ValueError:
-            logger.error("[{}] 无效 chat_id: {}", self.name, chat_id)
+            logger.error("[{}] Invalid chat_id: {}", self.name, chat_id)
             return
 
         reply_params = None
@@ -243,9 +243,9 @@ class TelegramChannel(BaseChannel):
                         reply_parameters=reply_params,
                     )
                 except Exception as e2:
-                    logger.error("[{}] 发送 Telegram 消息失败: {}", self.name, e2)
+                    logger.error("[{}] Failed to send Telegram message: {}", self.name, e2)
 
-    # ── 入站：事件处理 ────────────────────────────────────────────────────────
+    # ── Inbound: event handling ───────────────────────────────────────────────
 
     async def _on_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:  # type: ignore[name-defined]
         if not update.message or not update.effective_user:
@@ -333,13 +333,13 @@ class TelegramChannel(BaseChannel):
                 file_path = media_dir / f"{media_file.file_id[:16]}{ext}"
                 await file.download_to_drive(str(file_path))
                 content_parts.append(f"[{media_type}: {file_path}]")
-                logger.debug("[{}] 下载媒体 {} -> {}", self.name, media_type, file_path)
+                logger.debug("[{}] Downloaded media {} -> {}", self.name, media_type, file_path)
             except Exception as e:
-                logger.error("[{}] 下载媒体失败: {}", self.name, e)
+                logger.error("[{}] Failed to download media: {}", self.name, e)
                 content_parts.append(f"[{media_type}: download failed]")
 
         content = "\n".join(content_parts) if content_parts else "[empty message]"
-        logger.debug("[{}] 收到消息 from {}: {}...", self.name, sender_id, content[:50])
+        logger.debug("[{}] Received message from {}: {}...", self.name, sender_id, content[:50])
 
         self._start_typing(chat_id)
 
@@ -381,7 +381,7 @@ class TelegramChannel(BaseChannel):
     async def _on_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:  # type: ignore[name-defined]
         logger.error("[{}] Telegram error: {}", self.name, context.error)
 
-    # ── 工具方法 ──────────────────────────────────────────────────────────────
+    # ── Utility methods ───────────────────────────────────────────────────────
 
     @staticmethod
     def _get_media_type(path: str) -> str:

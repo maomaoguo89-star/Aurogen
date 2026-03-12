@@ -1,4 +1,4 @@
-"""WebChannel：通过 HTTP/SSE 收发消息的 channel 实现。"""
+"""WebChannel: channel implementation for sending/receiving messages via HTTP/SSE."""
 
 import asyncio
 from typing import AsyncGenerator
@@ -11,13 +11,13 @@ from message.queue_manager import get_inbound_queue
 
 class WebChannel(BaseChannel):
     """
-    Web channel，对应 session_id 前缀 "web"。
+    Web channel; session_id prefix is "web".
 
-    入站：HTTP POST 请求 → receive() → inbound_queue
-    出站：send() → broadcaster.publish() → SSE 流推送给客户端
+    Inbound: HTTP POST request → receive() → inbound_queue
+    Outbound: send() → broadcaster.publish() → SSE stream pushed to client
 
-    SSE 进度事件（TOOL_CALL / TOOL_RESULT）由 AgentLoop 直接调用
-    broadcaster，无需经过 ChannelManager 路由，WebChannel 不干预。
+    SSE progress events (TOOL_CALL / TOOL_RESULT) are published by AgentLoop
+    directly via broadcaster; no ChannelManager routing; WebChannel does not intervene.
     """
 
     name = "web"
@@ -26,7 +26,7 @@ class WebChannel(BaseChannel):
         self.name = channel_key
 
     async def receive(self, session_id: str, content: str, metadata: dict | None = None) -> None:
-        """将入站消息投入 inbound_queue。"""
+        """Put inbound message into inbound_queue."""
         msg = InboundMessage(
             session_id=session_id,
             content=content,
@@ -35,7 +35,7 @@ class WebChannel(BaseChannel):
         await get_inbound_queue().put(msg)
 
     async def send(self, chat_id: str, content: str) -> None:
-        """将最终回复推送到对应 session 的 SSE 队列。"""
+        """Push final reply to the SSE queue for the given session."""
         session_id = f"{self.name}@{chat_id}"
         await get_broadcaster().publish(AgentEvent(
             session_id=session_id,
@@ -44,21 +44,21 @@ class WebChannel(BaseChannel):
         ))
 
     async def notify(self, event: AgentEvent) -> None:
-        """将中间事件（THINKING/TOOL_CALL/TOOL_RESULT）推送到对应 session 的 SSE 队列。"""
+        """Push intermediate events (THINKING/TOOL_CALL/TOOL_RESULT) to the SSE queue for the given session."""
         await get_broadcaster().publish(event)
 
     async def subscribe(self, session_id: str) -> asyncio.Queue:
-        """注册 SSE 订阅，返回该 session 的事件队列。"""
+        """Register SSE subscription; return the event queue for this session."""
         return await get_broadcaster().subscribe(session_id)
 
     async def unsubscribe(self, session_id: str) -> None:
-        """注销 SSE 订阅。"""
+        """Unregister SSE subscription."""
         await get_broadcaster().unsubscribe(session_id)
 
     def event_stream(self, queue: asyncio.Queue) -> AsyncGenerator[str, None]:
         """
-        返回一个异步生成器，消费队列中的事件并生成 SSE 格式字符串。
-        收到 FINAL 事件后自动结束。
+        Return an async generator that consumes events from the queue and yields SSE-formatted strings.
+        Stops automatically after receiving a FINAL event.
         """
         async def _gen():
             while True:

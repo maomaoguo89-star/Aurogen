@@ -21,6 +21,7 @@ export class BridgeServer {
   private wss: WebSocketServer | null = null;
   private wa: WhatsAppClient | null = null;
   private clients: Set<WebSocket> = new Set();
+  private lastQr: string | null = null;
 
   constructor(private port: number, private authDir: string, private token?: string) {}
 
@@ -34,8 +35,14 @@ export class BridgeServer {
     this.wa = new WhatsAppClient({
       authDir: this.authDir,
       onMessage: (msg) => this.broadcast({ type: 'message', ...msg }),
-      onQR: (qr) => this.broadcast({ type: 'qr', qr }),
-      onStatus: (status) => this.broadcast({ type: 'status', status }),
+      onQR: (qr) => {
+        this.lastQr = qr;
+        this.broadcast({ type: 'qr', qr });
+      },
+      onStatus: (status) => {
+        if (status === 'connected') this.lastQr = null;
+        this.broadcast({ type: 'status', status });
+      },
     });
 
     // Handle WebSocket connections
@@ -69,6 +76,10 @@ export class BridgeServer {
 
   private setupClient(ws: WebSocket): void {
     this.clients.add(ws);
+
+    if (this.lastQr) {
+      ws.send(JSON.stringify({ type: 'qr', qr: this.lastQr }));
+    }
 
     ws.on('message', async (data) => {
       try {

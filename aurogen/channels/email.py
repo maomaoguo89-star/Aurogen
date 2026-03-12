@@ -25,25 +25,25 @@ class EmailChannel(BaseChannel):
     """Email channel using IMAP polling for inbound and SMTP for outbound.
 
     settings:
-        imap_host            : IMAP 服务器地址
-        imap_port            : IMAP 端口 (default: 993)
-        imap_username        : IMAP 登录用户名
-        imap_password        : IMAP 登录密码
-        imap_use_ssl         : 是否使用 SSL (default: true)
-        imap_mailbox         : 轮询的邮箱文件夹 (default: "INBOX")
-        smtp_host            : SMTP 服务器地址
-        smtp_port            : SMTP 端口 (default: 465)
-        smtp_username        : SMTP 登录用户名
-        smtp_password        : SMTP 登录密码
-        smtp_use_ssl         : 是否使用 SMTP SSL (default: true)
-        smtp_use_tls         : 是否使用 STARTTLS (default: false)
-        from_address         : 发件人地址 (default: smtp_username)
-        consent_granted      : 安全开关，必须显式设为 true (default: false)
-        auto_reply_enabled   : 是否自动回复 (default: true)
-        mark_seen            : 轮询后标记已读 (default: true)
-        poll_interval_seconds: 轮询间隔秒数 (default: 30)
-        max_body_chars       : 邮件正文最大字符数 (default: 10000)
-        subject_prefix       : 回复邮件主题前缀 (default: "Re: ")
+        imap_host            : IMAP server host
+        imap_port            : IMAP port (default: 993)
+        imap_username        : IMAP login username
+        imap_password        : IMAP login password
+        imap_use_ssl         : Use SSL for IMAP (default: true)
+        imap_mailbox         : Mailbox folder to poll (default: "INBOX")
+        smtp_host            : SMTP server host
+        smtp_port            : SMTP port (default: 465)
+        smtp_username        : SMTP login username
+        smtp_password        : SMTP login password
+        smtp_use_ssl         : Use SSL for SMTP (default: true)
+        smtp_use_tls         : Use STARTTLS (default: false)
+        from_address         : From address (default: smtp_username)
+        consent_granted      : Safety switch, must be explicitly set to true (default: false)
+        auto_reply_enabled   : Enable auto-reply (default: true)
+        mark_seen            : Mark messages as seen after poll (default: true)
+        poll_interval_seconds: Poll interval in seconds (default: 30)
+        max_body_chars       : Max characters for email body (default: 10000)
+        subject_prefix       : Reply subject prefix (default: "Re: ")
     """
 
     _IMAP_MONTHS = (
@@ -59,7 +59,7 @@ class EmailChannel(BaseChannel):
         self._imap_port: int = int(settings.get("imap_port", 993))
         self._imap_username: str = settings.get("imap_username", "")
         self._imap_password: str = settings.get("imap_password", "")
-        self._imap_use_ssl: bool = bool(settings.get("imap_use_ssl", True))
+        self._imap_use_ssl: bool = str(settings.get("imap_use_ssl", True)).lower() not in ("false", "0", "no")
         self._imap_mailbox: str = settings.get("imap_mailbox", "INBOX")
 
         # SMTP
@@ -67,14 +67,15 @@ class EmailChannel(BaseChannel):
         self._smtp_port: int = int(settings.get("smtp_port", 465))
         self._smtp_username: str = settings.get("smtp_username", "")
         self._smtp_password: str = settings.get("smtp_password", "")
-        self._smtp_use_ssl: bool = bool(settings.get("smtp_use_ssl", True))
-        self._smtp_use_tls: bool = bool(settings.get("smtp_use_tls", False))
+        self._smtp_use_ssl: bool = str(settings.get("smtp_use_ssl", True)).lower() not in ("false", "0", "no")
+        self._smtp_use_tls: bool = str(settings.get("smtp_use_tls", False)).lower() in ("true", "1", "yes")
 
         # Misc
         self._from_address: str = settings.get("from_address", "")
-        self._consent_granted: bool = bool(settings.get("consent_granted", False))
-        self._auto_reply_enabled: bool = bool(settings.get("auto_reply_enabled", True))
-        self._mark_seen: bool = bool(settings.get("mark_seen", True))
+        _consent_raw = settings.get("consent_granted", False)
+        self._consent_granted: bool = str(_consent_raw).lower() in ("true", "1", "yes")
+        self._auto_reply_enabled: bool = str(settings.get("auto_reply_enabled", True)).lower() not in ("false", "0", "no")
+        self._mark_seen: bool = str(settings.get("mark_seen", True)).lower() not in ("false", "0", "no")
         self._poll_interval_seconds: int = int(settings.get("poll_interval_seconds", 30))
         self._max_body_chars: int = int(settings.get("max_body_chars", 10000))
         self._subject_prefix: str = settings.get("subject_prefix", "Re: ")
@@ -90,8 +91,8 @@ class EmailChannel(BaseChannel):
     async def start(self) -> None:
         if not self._consent_granted:
             logger.warning(
-                "[{}] Email channel 已禁用: consent_granted 为 false，"
-                "请在用户明确授权后设为 true",
+                "[{}] Email channel disabled: consent_granted is false; "
+                "set to true after user explicitly grants consent",
                 self.name,
             )
             return
@@ -101,7 +102,7 @@ class EmailChannel(BaseChannel):
 
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())
-        logger.info("[{}] Email channel 已启动（IMAP 轮询模式）", self.name)
+        logger.info("[{}] Email channel started (IMAP polling mode)", self.name)
 
     async def _poll_loop(self) -> None:
         poll_seconds = max(5, self._poll_interval_seconds)
@@ -125,7 +126,7 @@ class EmailChannel(BaseChannel):
                         metadata=item.get("metadata", {}),
                     ))
             except Exception as e:
-                logger.error("[{}] Email 轮询异常: {}", self.name, e)
+                logger.error("[{}] Email poll error: {}", self.name, e)
 
             await asyncio.sleep(poll_seconds)
 
@@ -137,26 +138,26 @@ class EmailChannel(BaseChannel):
                 await self._poll_task
             except asyncio.CancelledError:
                 pass
-        logger.info("[{}] Email channel 已停止", self.name)
+        logger.info("[{}] Email channel stopped", self.name)
 
-    # ── 出站：发送邮件 ────────────────────────────────────────────────────────
+    # ── Outbound: send email ───────────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
         if not self._consent_granted:
-            logger.warning("[{}] 跳过发送: consent_granted 为 false", self.name)
+            logger.warning("[{}] Skip send: consent_granted is false", self.name)
             return
 
         if not self._auto_reply_enabled:
-            logger.info("[{}] 跳过自动回复: auto_reply_enabled 为 false", self.name)
+            logger.info("[{}] Skip auto-reply: auto_reply_enabled is false", self.name)
             return
 
         if not self._smtp_host:
-            logger.warning("[{}] SMTP host 未配置", self.name)
+            logger.warning("[{}] SMTP host not configured", self.name)
             return
 
         to_addr = chat_id.strip()
         if not to_addr:
-            logger.warning("[{}] 缺少收件人地址", self.name)
+            logger.warning("[{}] Missing recipient address", self.name)
             return
         if not content or not content.strip():
             return
@@ -178,9 +179,9 @@ class EmailChannel(BaseChannel):
         try:
             await asyncio.to_thread(self._smtp_send, email_msg)
         except Exception as e:
-            logger.error("[{}] 发送邮件到 {} 失败: {}", self.name, to_addr, e)
+            logger.error("[{}] Failed to send email to {}: {}", self.name, to_addr, e)
 
-    # ── 配置校验 ──────────────────────────────────────────────────────────────
+    # ── Config validation ──────────────────────────────────────────────────────
 
     def _validate_config(self) -> bool:
         missing = []
@@ -198,11 +199,11 @@ class EmailChannel(BaseChannel):
             missing.append("smtp_password")
 
         if missing:
-            logger.error("[{}] Email channel 配置缺失: {}", self.name, ", ".join(missing))
+            logger.error("[{}] Email channel config missing: {}", self.name, ", ".join(missing))
             return False
         return True
 
-    # ── SMTP 发送 ─────────────────────────────────────────────────────────────
+    # ── SMTP send ─────────────────────────────────────────────────────────────
 
     def _smtp_send(self, msg: EmailMessage) -> None:
         timeout = 30
@@ -218,7 +219,7 @@ class EmailChannel(BaseChannel):
             smtp.login(self._smtp_username, self._smtp_password)
             smtp.send_message(msg)
 
-    # ── IMAP 收取 ─────────────────────────────────────────────────────────────
+    # ── IMAP fetch ────────────────────────────────────────────────────────────
 
     def _fetch_new_messages(self) -> list[dict[str, Any]]:
         return self._fetch_messages(
@@ -344,7 +345,7 @@ class EmailChannel(BaseChannel):
 
         return messages
 
-    # ── 工具方法 ──────────────────────────────────────────────────────────────
+    # ── Helper methods ─────────────────────────────────────────────────────────
 
     @classmethod
     def _format_imap_date(cls, value: date) -> str:

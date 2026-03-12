@@ -23,7 +23,12 @@ class MessageTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Send a message to the user. Use this when you want to communicate something."
+        return (
+            "Send an outbound message through the current channel without using the normal final reply. "
+            "Only use this for proactive notifications during long-running work, sending to another user/channel, "
+            "or when the user explicitly asks you to send a message. Do NOT use this for ordinary replies in the "
+            "current conversation; answer normally instead."
+        )
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -32,7 +37,10 @@ class MessageTool(Tool):
             "properties": {
                 "content": {
                     "type": "string",
-                    "description": "The message content to send",
+                    "description": (
+                        "Outbound message content to send via the channel manager. "
+                        "Not for ordinary in-chat replies."
+                    ),
                 },
             },
             "required": ["content"],

@@ -1,4 +1,4 @@
-"""FeishuChannel：飞书/Lark channel，通过 WebSocket 长连接收发消息。"""
+"""FeishuChannel: Feishu/Lark channel, sends and receives messages via WebSocket long connection."""
 
 import asyncio
 import json
@@ -69,7 +69,7 @@ class _ThreadLocalLoopProxy:
 _loop_proxy = _ThreadLocalLoopProxy()
 
 
-# ── 消息内容解析工具函数（直接移植自 feishu.py）──────────────────────────────
+# ── Message content parsing helpers ──────────────────────────────────────────
 
 def _extract_share_card_content(content_json: dict, msg_type: str) -> str:
     parts = []
@@ -229,14 +229,14 @@ def _extract_post_content(content_json: dict) -> tuple[str, list[str]]:
 
 class FeishuChannel(BaseChannel):
     """
-    飞书 channel，通过 WebSocket 长连接接收消息，通过 HTTP API 发送消息。
+    Feishu channel: receives messages via WebSocket long connection, sends via HTTP API.
 
-    settings 字段（均从 config.channels.<key>.settings 读取）：
-        app_id             : 飞书应用 App ID
-        app_secret         : 飞书应用 App Secret
-        encrypt_key        : 消息加密密钥（可空）
-        verification_token : 验证 token（可空）
-        react_emoji        : 收到消息后自动添加的 emoji 反应，默认 "THUMBSUP"
+    settings (from config.channels.<key>.settings):
+        app_id             : Feishu app App ID
+        app_secret         : Feishu app App Secret
+        encrypt_key        : Message encryption key (optional)
+        verification_token : Verification token (optional)
+        react_emoji        : Emoji reaction added automatically on receive, default "THUMBSUP"
     """
 
     _TABLE_RE = re.compile(
@@ -254,8 +254,8 @@ class FeishuChannel(BaseChannel):
 
     def __init__(self, channel_key: str, settings: dict):
         """
-        channel_key : config 中的 key，同时作为 session_id 前缀（如 "feishu_work"）
-        settings    : config.channels.<key>.settings 字典
+        channel_key : Key in config, also used as session_id prefix (e.g. "feishu_work")
+        settings    : config.channels.<key>.settings dict
         """
         self.name = channel_key
         self._app_id: str = settings.get("app_id", "")
@@ -271,21 +271,21 @@ class FeishuChannel(BaseChannel):
         self._loop: asyncio.AbstractEventLoop | None = None
         self._processed_message_ids: OrderedDict[str, None] = OrderedDict()
 
-    # ── 生命周期 ──────────────────────────────────────────────────────────────
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
-        """启动飞书 WebSocket 长连接（非阻塞，后台线程运行）。"""
+        """Start Feishu WebSocket long connection (non-blocking, runs in background thread)."""
         if not FEISHU_AVAILABLE:
-            logger.error("[{}] lark-oapi 未安装，运行: pip install lark-oapi", self.name)
+            logger.error("[{}] lark-oapi not installed, run: pip install lark-oapi", self.name)
             return
         if not self._app_id or not self._app_secret:
-            logger.error("[{}] app_id 或 app_secret 未配置", self.name)
+            logger.error("[{}] app_id or app_secret not configured", self.name)
             return
 
         self._running = True
         self._loop = asyncio.get_running_loop()
 
-        # REST 客户端：纯同步，在主协程创建，供 send() / _add_reaction_sync() 等使用
+        # REST client: sync-only, created in main coroutine for send() / _add_reaction_sync() etc.
         self._client = (
             lark.Client.builder()
             .app_id(self._app_id)
@@ -294,8 +294,8 @@ class FeishuChannel(BaseChannel):
             .build()
         )
 
-        # 把构造 WS 客户端所需的参数传入闭包，避免在主线程创建 WS 客户端
-        # （lark ws.Client.__init__ 会创建 asyncio.Lock，必须在最终运行它的 loop 上创建）
+        # Pass WS client params into closure so WS client is not created on main thread
+        # (lark ws.Client.__init__ creates asyncio.Lock, must be created on the loop that runs it)
         app_id = self._app_id
         app_secret = self._app_secret
         encrypt_key = self._encrypt_key
@@ -323,9 +323,9 @@ class FeishuChannel(BaseChannel):
 
             while self._running:
                 try:
-                    ws_client.start()  # 阻塞直到断连；lark 内部自动重连
+                    ws_client.start()  # Blocks until disconnect; lark auto-reconnects internally
                 except Exception as e:
-                    logger.warning("[{}] WebSocket 异常: {}", self.name, e)
+                    logger.warning("[{}] WebSocket error: {}", self.name, e)
                 if self._running:
                     import time
                     time.sleep(5)
@@ -334,19 +334,19 @@ class FeishuChannel(BaseChannel):
 
         self._ws_thread = threading.Thread(target=_run_ws, daemon=True)
         self._ws_thread.start()
-        logger.info("[{}] 飞书 channel 已启动（WebSocket 长连接）", self.name)
+        logger.info("[{}] Feishu channel started (WebSocket long connection)", self.name)
 
     async def stop(self) -> None:
-        """停止飞书 channel。"""
+        """Stop Feishu channel."""
         self._running = False
-        logger.info("[{}] 飞书 channel 已停止", self.name)
+        logger.info("[{}] Feishu channel stopped", self.name)
 
-    # ── 出站：发送消息 ────────────────────────────────────────────────────────
+    # ── Outbound: send message ─────────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
-        """向指定 chat_id 发送飞书消息（渲染为 interactive card）。"""
+        """Send Feishu message to given chat_id (rendered as interactive card)."""
         if not self._client:
-            logger.warning("[{}] 客户端未初始化", self.name)
+            logger.warning("[{}] Client not initialized", self.name)
             return
         if not content or not content.strip():
             return
@@ -365,22 +365,22 @@ class FeishuChannel(BaseChannel):
                 json.dumps(card, ensure_ascii=False),
             )
         except Exception as e:
-            logger.error("[{}] 发送消息失败: {}", self.name, e)
+            logger.error("[{}] Send message failed: {}", self.name, e)
 
     async def notify(self, event: AgentEvent) -> None:
-        """推送中间事件到飞书用户（THINKING/TOOL_CALL/TOOL_RESULT）。"""
+        """Push intermediate events to Feishu user (THINKING/TOOL_CALL/TOOL_RESULT)."""
         chat_id = event.session_id.split("@", 1)[1] if "@" in event.session_id else ""
         if not chat_id:
             return
         if event.event_type == EventType.THINKING:
             thinking = event.data.get("content", "")
-            text = f"💭 思考中...\n{thinking[:300]}"
+            text = f"💭 Thinking...\n{thinking[:300]}"
         elif event.event_type == EventType.TOOL_CALL:
             args_str = json.dumps(event.data.get("args", {}), ensure_ascii=False)
-            text = f"🔧 调用工具: {event.data.get('tool_name')}\n参数: {args_str}"
+            text = f"🔧 Tool call: {event.data.get('tool_name')}\nArgs: {args_str}"
         elif event.event_type == EventType.TOOL_RESULT:
             result = str(event.data.get("result", ""))
-            text = f"✅ 工具结果: {event.data.get('tool_name')}\n{result[:300]}"
+            text = f"✅ Tool result: {event.data.get('tool_name')}\n{result[:300]}"
         else:
             return
         await self.send(chat_id, text)
@@ -407,27 +407,27 @@ class FeishuChannel(BaseChannel):
             try:
                 response = self._client.im.v1.message.create(request)
                 if not response.success():
-                    logger.error("[{}] 发送失败: code={}, msg={}", self.name, response.code, response.msg)
+                    logger.error("[{}] Send failed: code={}, msg={}", self.name, response.code, response.msg)
                     return False
                 return True
             except Exception as e:
                 if attempt < _max_retries - 1:
                     delay = 1 * (attempt + 1)
-                    logger.warning("[{}] 发送异常 (retry {}/{}): {}", self.name, attempt + 1, _max_retries, e)
+                    logger.warning("[{}] Send error (retry {}/{}): {}", self.name, attempt + 1, _max_retries, e)
                     time.sleep(delay)
                 else:
-                    logger.error("[{}] 发送异常 (已重试 {} 次): {}", self.name, _max_retries, e)
+                    logger.error("[{}] Send error (retried {} times): {}", self.name, _max_retries, e)
         return False
 
-    # ── 入站：接收消息 ────────────────────────────────────────────────────────
+    # ── Inbound: receive message ──────────────────────────────────────────────
 
     def _on_message_sync(self, data: "P2ImMessageReceiveV1") -> None:
-        """WebSocket 线程同步回调，桥接到 asyncio 事件循环。"""
+        """WebSocket thread sync callback, bridge to asyncio event loop."""
         if self._loop and self._loop.is_running():
             asyncio.run_coroutine_threadsafe(self._on_message(data), self._loop)
 
     async def _on_message(self, data: "P2ImMessageReceiveV1") -> None:
-        """处理入站消息，解析后投入 inbound_queue。"""
+        """Handle inbound message, parse and put into inbound_queue."""
         try:
             event = data.event
             message = event.message
@@ -435,14 +435,14 @@ class FeishuChannel(BaseChannel):
 
             message_id = message.message_id
 
-            # 去重
+            # Deduplicate
             if message_id in self._processed_message_ids:
                 return
             self._processed_message_ids[message_id] = None
             while len(self._processed_message_ids) > 1000:
                 self._processed_message_ids.popitem(last=False)
 
-            # 过滤 bot 自身消息
+            # Filter bot's own messages
             if sender.sender_type == "bot":
                 return
 
@@ -453,7 +453,7 @@ class FeishuChannel(BaseChannel):
 
             await self._add_reaction(message_id, self._react_emoji)
 
-            # 解析消息内容
+            # Parse message content
             content_parts: list[str] = []
             media_paths: list[str] = []
 
@@ -497,7 +497,7 @@ class FeishuChannel(BaseChannel):
             if not content and not media_paths:
                 return
 
-            # 群消息回复到群，私聊回复到 open_id
+            # Group message reply to group, private chat reply to open_id
             reply_to = chat_id if chat_type == "group" else sender_id
             session_id = f"{self.name}@{reply_to}"
 
@@ -514,9 +514,9 @@ class FeishuChannel(BaseChannel):
             ))
 
         except Exception as e:
-            logger.error("[{}] 处理消息异常: {}", self.name, e)
+            logger.error("[{}] Process message error: {}", self.name, e)
 
-    # ── 表情反应 ──────────────────────────────────────────────────────────────
+    # ── Emoji reaction ───────────────────────────────────────────────────────
 
     async def _add_reaction(self, message_id: str, emoji_type: str = "THUMBSUP") -> None:
         if not self._client or not Emoji:
@@ -538,11 +538,11 @@ class FeishuChannel(BaseChannel):
             )
             response = self._client.im.v1.message_reaction.create(request)
             if not response.success():
-                logger.warning("[{}] 添加表情失败: code={}", self.name, response.code)
+                logger.warning("[{}] Add reaction failed: code={}", self.name, response.code)
         except Exception as e:
-            logger.warning("[{}] 添加表情异常: {}", self.name, e)
+            logger.warning("[{}] Add reaction error: {}", self.name, e)
 
-    # ── 媒体下载 ──────────────────────────────────────────────────────────────
+    # ── Media download ───────────────────────────────────────────────────────
 
     async def _download_and_save_media(
         self, msg_type: str, content_json: dict, message_id: str | None = None
@@ -596,7 +596,7 @@ class FeishuChannel(BaseChannel):
                 return file_data, response.file_name
             return None, None
         except Exception as e:
-            logger.error("[{}] 下载图片失败: {}", self.name, e)
+            logger.error("[{}] Download image failed: {}", self.name, e)
             return None, None
 
     def _download_file_sync(self, message_id: str, file_key: str, resource_type: str = "file") -> tuple[bytes | None, str | None]:
@@ -616,10 +616,10 @@ class FeishuChannel(BaseChannel):
                 return file_data, response.file_name
             return None, None
         except Exception:
-            logger.exception("[{}] 下载文件失败: {}", self.name, file_key)
+            logger.exception("[{}] Download file failed: {}", self.name, file_key)
             return None, None
 
-    # ── Markdown → 飞书 Card 渲染（直接移植自 feishu.py）────────────────────
+    # ── Markdown → Feishu card rendering ──────────────────────────────────────
 
     @staticmethod
     def _parse_md_table(table_text: str) -> dict | None:

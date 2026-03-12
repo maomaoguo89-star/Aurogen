@@ -27,8 +27,8 @@ class SessionInfo(BaseModel):
 
 
 class AddChannelRequest(BaseModel):
-    key: str           # config key，也是 session_id 前缀，如 "feishu_work"
-    type: str          # channel 类型，如 "feishu"
+    key: str           # config key, also session_id prefix, e.g. "feishu_work"
+    type: str          # channel type, e.g. "feishu"
     agent_name: str
     description: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
@@ -36,8 +36,8 @@ class AddChannelRequest(BaseModel):
 
 
 class AddAgentRequest(BaseModel):
-    name: str           # agent key，也是 workspace 目录名，如 "assistant"
-    display_name: str   # 显示名，对应 AgentConfig.name
+    name: str           # agent key, also workspace dir name, e.g. "assistant"
+    display_name: str   # display name, maps to AgentConfig.name
     description: str = ""
     provider: str
     emoji: str = ""

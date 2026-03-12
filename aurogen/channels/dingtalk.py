@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from typing import Any
+from urllib.parse import quote_plus
 
 import httpx
 from loguru import logger
@@ -11,6 +12,13 @@ from loguru import logger
 from channels.base import BaseChannel
 from message.events import AgentEvent, EventType, InboundMessage
 from message.queue_manager import get_inbound_queue
+
+try:
+    import websockets as _ws_lib
+    WS_AVAILABLE = True
+except ImportError:
+    WS_AVAILABLE = False
+    _ws_lib = None  # type: ignore[assignment]
 
 try:
     from dingtalk_stream import (
@@ -50,7 +58,7 @@ class DingTalkHandler(CallbackHandler):
 
             if not content:
                 logger.warning(
-                    "[{}] 收到空消息或不支持的消息类型: {}",
+                    "[{}] Received empty or unsupported message type: {}",
                     self.channel.name,
                     chatbot_msg.message_type,
                 )
@@ -59,7 +67,7 @@ class DingTalkHandler(CallbackHandler):
             sender_id = chatbot_msg.sender_staff_id or chatbot_msg.sender_id
             sender_name = chatbot_msg.sender_nick or "Unknown"
 
-            logger.info("[{}] 收到消息 from {} ({}): {}", self.channel.name, sender_name, sender_id, content)
+            logger.info("[{}] Received message from {} ({}): {}", self.channel.name, sender_name, sender_id, content)
 
             task = asyncio.create_task(
                 self.channel._on_message(content, sender_id, sender_name)
@@ -70,7 +78,7 @@ class DingTalkHandler(CallbackHandler):
             return AckMessage.STATUS_OK, "OK"
 
         except Exception as e:
-            logger.error("[{}] 处理钉钉消息异常: {}", self.channel.name, e)
+            logger.error("[{}] Error processing DingTalk message: {}", self.channel.name, e)
             return AckMessage.STATUS_OK, "Error"
 
 
@@ -81,8 +89,8 @@ class DingTalkChannel(BaseChannel):
     Uses direct HTTP API to send messages.
 
     settings:
-        client_id     : 钉钉应用 Client ID (AppKey)
-        client_secret : 钉钉应用 Client Secret (AppSecret)
+        client_id     : DingTalk app Client ID (AppKey)
+        client_secret : DingTalk app Client Secret (AppSecret)
     """
 
     def __init__(self, channel_key: str, settings: dict):
@@ -94,47 +102,80 @@ class DingTalkChannel(BaseChannel):
         self._access_token: str | None = None
         self._token_expiry: float = 0
         self._stream_task: asyncio.Task | None = None
+        self._gateway_ws: Any = None
         self._background_tasks: set[asyncio.Task] = set()
         self._running = False
 
     async def start(self) -> None:
         if not DINGTALK_AVAILABLE:
-            logger.error("[{}] dingtalk-stream 未安装，运行: pip install dingtalk-stream", self.name)
+            logger.error("[{}] dingtalk-stream not installed, run: pip install dingtalk-stream", self.name)
             return
 
         if not self._client_id or not self._client_secret:
-            logger.error("[{}] client_id 或 client_secret 未配置", self.name)
+            logger.error("[{}] client_id or client_secret not configured", self.name)
             return
 
         self._running = True
         self._http = httpx.AsyncClient()
-
-        credential = Credential(self._client_id, self._client_secret)
-        self._client = DingTalkStreamClient(credential)
-
-        handler = DingTalkHandler(self)
-        self._client.register_callback_handler(ChatbotMessage.TOPIC, handler)
-
         self._stream_task = asyncio.create_task(self._run_stream())
-        logger.info("[{}] 钉钉 bot 已启动（Stream 模式）", self.name)
+        logger.info("[{}] DingTalk bot started (Stream mode)", self.name)
+
+    def _build_client(self) -> Any:
+        credential = Credential(self._client_id, self._client_secret)
+        client = DingTalkStreamClient(credential)
+        handler = DingTalkHandler(self)
+        client.register_callback_handler(ChatbotMessage.TOPIC, handler)
+        client.pre_start()
+        return client
 
     async def _run_stream(self) -> None:
+        """Manage connection loop manually, bypassing SDK start() (which swallows CancelledError and cannot stop)."""
+        self._client = self._build_client()
         while self._running:
             try:
-                await self._client.start()
+                connection = await asyncio.to_thread(self._client.open_connection)
+                if not connection:
+                    logger.warning("[{}] DingTalk open_connection failed, retrying in 10 seconds", self.name)
+                    await asyncio.sleep(10)
+                    continue
+
+                uri = f'{connection["endpoint"]}?ticket={quote_plus(connection["ticket"])}'
+                async with _ws_lib.connect(uri) as ws:
+                    self._gateway_ws = ws
+                    self._client.websocket = ws
+                    keepalive_task = asyncio.create_task(self._client.keepalive(ws))
+                    try:
+                        async for raw_message in ws:
+                            if not self._running:
+                                break
+                            json_message = json.loads(raw_message)
+                            asyncio.create_task(self._client.background_task(json_message))
+                    finally:
+                        keepalive_task.cancel()
+                        self._gateway_ws = None
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.warning("[{}] 钉钉 stream 异常: {}", self.name, e)
+                if not self._running:
+                    break
+                logger.warning("[{}] DingTalk stream error: {}", self.name, e)
             if self._running:
-                logger.info("[{}] 5 秒后重连钉钉 stream...", self.name)
+                logger.info("[{}] Reconnecting DingTalk stream in 5 seconds...", self.name)
                 await asyncio.sleep(5)
 
     async def stop(self) -> None:
         self._running = False
+        if self._gateway_ws:
+            try:
+                await self._gateway_ws.close()
+            except Exception:
+                pass
+            self._gateway_ws = None
         if self._stream_task:
             self._stream_task.cancel()
             try:
-                await self._stream_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._stream_task, timeout=3)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
         if self._http:
             await self._http.aclose()
@@ -142,9 +183,9 @@ class DingTalkChannel(BaseChannel):
         for task in self._background_tasks:
             task.cancel()
         self._background_tasks.clear()
-        logger.info("[{}] 钉钉 bot 已停止", self.name)
+        logger.info("[{}] DingTalk bot stopped", self.name)
 
-    # ── 出站：发送消息 ────────────────────────────────────────────────────────
+    # ── Outbound: send message ─────────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
         if not content or not content.strip():
@@ -166,15 +207,15 @@ class DingTalkChannel(BaseChannel):
         }
 
         if not self._http:
-            logger.warning("[{}] HTTP 客户端未初始化", self.name)
+            logger.warning("[{}] HTTP client not initialized", self.name)
             return
 
         try:
             resp = await self._http.post(url, json=data, headers=headers)
             if resp.status_code != 200:
-                logger.error("[{}] 发送钉钉消息失败: {}", self.name, resp.text)
+                logger.error("[{}] Failed to send DingTalk message: {}", self.name, resp.text)
         except Exception as e:
-            logger.error("[{}] 发送钉钉消息异常: {}", self.name, e)
+            logger.error("[{}] Error sending DingTalk message: {}", self.name, e)
 
     async def notify(self, event: AgentEvent) -> None:
         chat_id = event.session_id.split("@", 1)[1] if "@" in event.session_id else ""
@@ -182,25 +223,25 @@ class DingTalkChannel(BaseChannel):
             return
         if event.event_type == EventType.THINKING:
             thinking = event.data.get("content", "")
-            text = f"思考中...\n{thinking[:300]}"
+            text = f"Thinking...\n{thinking[:300]}"
         elif event.event_type == EventType.TOOL_CALL:
             args_str = json.dumps(event.data.get("args", {}), ensure_ascii=False)
-            text = f"调用工具: {event.data.get('tool_name')}\n参数: {args_str}"
+            text = f"Calling tool: {event.data.get('tool_name')}\nArgs: {args_str}"
         elif event.event_type == EventType.TOOL_RESULT:
             result = str(event.data.get("result", ""))
-            text = f"工具结果: {event.data.get('tool_name')}\n{result[:300]}"
+            text = f"Tool result: {event.data.get('tool_name')}\n{result[:300]}"
         else:
             return
         await self.send(chat_id, text)
 
-    # ── Access Token 管理 ─────────────────────────────────────────────────────
+    # ── Access Token management ───────────────────────────────────────────────
 
     async def _get_access_token(self) -> str | None:
         if self._access_token and time.time() < self._token_expiry:
             return self._access_token
 
         if not self._http:
-            logger.warning("[{}] HTTP 客户端未初始化，无法刷新 token", self.name)
+            logger.warning("[{}] HTTP client not initialized, cannot refresh token", self.name)
             return None
 
         url = "https://api.dingtalk.com/v1.0/oauth2/accessToken"
@@ -214,10 +255,10 @@ class DingTalkChannel(BaseChannel):
             self._token_expiry = time.time() + int(res_data.get("expireIn", 7200)) - 60
             return self._access_token
         except Exception as e:
-            logger.error("[{}] 获取钉钉 access token 失败: {}", self.name, e)
+            logger.error("[{}] Failed to get DingTalk access token: {}", self.name, e)
             return None
 
-    # ── 入站：接收消息 ────────────────────────────────────────────────────────
+    # ── Inbound: receive message ──────────────────────────────────────────────
 
     async def _on_message(self, content: str, sender_id: str, sender_name: str) -> None:
         try:
@@ -232,4 +273,4 @@ class DingTalkChannel(BaseChannel):
                 },
             ))
         except Exception as e:
-            logger.error("[{}] 处理钉钉入站消息异常: {}", self.name, e)
+            logger.error("[{}] Error processing DingTalk inbound message: {}", self.name, e)

@@ -1,4 +1,4 @@
-"""BaseChannel 抽象类，所有 channel 实现的统一接口。"""
+"""BaseChannel abstract class: unified interface for all channel implementations."""
 
 from __future__ import annotations
 
@@ -11,24 +11,24 @@ if TYPE_CHECKING:
 
 class BaseChannel(ABC):
     """
-    Channel 基类。
+    Base class for channels.
 
-    每个 channel 对应一种通信方式（web SSE、QQ、飞书等）。
-    入站：channel 负责接收外部消息并投入 inbound_queue。
-    出站：AgentLoop 处理完毕后通过 ChannelManager 路由到对应 channel 的 send()。
+    Each channel corresponds to one communication method (web SSE, QQ, Feishu, etc.).
+    Inbound: channel receives external messages and enqueues them to inbound_queue.
+    Outbound: after AgentLoop finishes, messages are routed via ChannelManager to the channel's send().
     """
 
-    name: str  # channel 标识符，与 session_id 前缀一致，如 "web" / "qq" / "feishu"
+    name: str  # channel identifier, matches session_id prefix, e.g. "web" / "qq" / "feishu"
 
     async def start(self) -> None:
-        """启动 channel（建立连接、注册事件监听等）。"""
+        """Start the channel (establish connection, register event listeners, etc.)."""
 
     async def stop(self) -> None:
-        """停止 channel。"""
+        """Stop the channel."""
 
     @abstractmethod
     async def send(self, chat_id: str, content: str) -> None:
-        """向指定 chat_id 发送最终回复消息。"""
+        """Send the final reply message to the given chat_id."""
 
     async def notify(self, event: "AgentEvent") -> None:
-        """推送中间事件（THINKING/TOOL_CALL/TOOL_RESULT）。默认不处理。"""
+        """Push intermediate events (THINKING/TOOL_CALL/TOOL_RESULT). No-op by default."""

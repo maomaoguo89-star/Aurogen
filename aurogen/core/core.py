@@ -121,7 +121,7 @@ class AgentLoop:
         self._running = True
         await self.cron_service.start()
         await self._setup_mcp()
-        print("[AgentLoop] 启动")
+        print("[AgentLoop] Starting...")
 
         inbound = get_inbound_queue()
 

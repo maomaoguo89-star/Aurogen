@@ -74,17 +74,19 @@ class DiscordChannel(BaseChannel):
 
     async def start(self) -> None:
         if not WEBSOCKETS_AVAILABLE:
-            logger.error("[{}] websockets 未安装，运行: pip install websockets", self.name)
+            logger.error("[{}] websockets not installed, run: pip install websockets", self.name)
             return
 
         if not self._token:
-            logger.error("[{}] Discord bot token 未配置", self.name)
+            logger.error("[{}] Discord bot token not configured", self.name)
             return
 
         self._running = True
         self._http = httpx.AsyncClient(timeout=30.0)
         self._gateway_task = asyncio.create_task(self._run_gateway())
-        logger.info("[{}] Discord bot 已启动", self.name)
+        logger.info("[{}] Discord bot started", self.name)
+
+    FATAL_CLOSE_CODES = {4004, 4010, 4011, 4012, 4013, 4014}
 
     async def _run_gateway(self) -> None:
         while self._running:
@@ -95,9 +97,17 @@ class DiscordChannel(BaseChannel):
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.warning("[{}] Discord gateway 异常: {}", self.name, e)
+                code = getattr(e, "code", None) if hasattr(e, "code") else None
+                if code in self.FATAL_CLOSE_CODES:
+                    logger.error(
+                        "[{}] Discord gateway fatal error (code={}): {}, stopped reconnecting",
+                        self.name, code, e,
+                    )
+                    self._running = False
+                    break
+                logger.warning("[{}] Discord gateway exception: {}", self.name, e)
             if self._running:
-                logger.info("[{}] 5 秒后重连 Discord gateway...", self.name)
+                logger.info("[{}] Reconnecting to Discord gateway in 5 seconds...", self.name)
                 await asyncio.sleep(5)
 
     async def stop(self) -> None:
@@ -120,13 +130,13 @@ class DiscordChannel(BaseChannel):
         if self._http:
             await self._http.aclose()
             self._http = None
-        logger.info("[{}] Discord bot 已停止", self.name)
+        logger.info("[{}] Discord bot stopped", self.name)
 
-    # ── 出站：发送消息 ────────────────────────────────────────────────────────
+    # ── Outbound: send message ────────────────────────────────────────────────
 
     async def send(self, chat_id: str, content: str) -> None:
         if not self._http:
-            logger.warning("[{}] HTTP 客户端未初始化", self.name)
+            logger.warning("[{}] HTTP client not initialized", self.name)
             return
         if not content or not content.strip():
             return
@@ -162,14 +172,14 @@ class DiscordChannel(BaseChannel):
                 if response.status_code == 429:
                     data = response.json()
                     retry_after = float(data.get("retry_after", 1.0))
-                    logger.warning("[{}] Discord 限流，{}s 后重试", self.name, retry_after)
+                    logger.warning("[{}] Discord rate limited, retrying in {}s", self.name, retry_after)
                     await asyncio.sleep(retry_after)
                     continue
                 response.raise_for_status()
                 return True
             except Exception as e:
                 if attempt == 2:
-                    logger.error("[{}] 发送 Discord 消息失败: {}", self.name, e)
+                    logger.error("[{}] Failed to send Discord message: {}", self.name, e)
                 else:
                     await asyncio.sleep(1)
         return False
@@ -203,7 +213,7 @@ class DiscordChannel(BaseChannel):
             elif op == 0 and event_type == "MESSAGE_CREATE":
                 await self._handle_message_create(payload)
             elif op in (7, 9):
-                logger.info("[{}] Discord gateway 请求重连 (op={})", self.name, op)
+                logger.info("[{}] Discord gateway requested reconnect (op={})", self.name, op)
                 break
 
     async def _identify(self) -> None:
@@ -233,13 +243,13 @@ class DiscordChannel(BaseChannel):
                 try:
                     await self._ws.send(json.dumps(payload))
                 except Exception as e:
-                    logger.warning("[{}] Discord 心跳失败: {}", self.name, e)
+                    logger.warning("[{}] Discord heartbeat failed: {}", self.name, e)
                     break
                 await asyncio.sleep(interval_s)
 
         self._heartbeat_task = asyncio.create_task(heartbeat_loop())
 
-    # ── 入站：接收消息 ────────────────────────────────────────────────────────
+    # ── Inbound: receive message ─────────────────────────────────────────────
 
     async def _handle_message_create(self, payload: dict[str, Any]) -> None:
         author = payload.get("author") or {}
@@ -275,7 +285,7 @@ class DiscordChannel(BaseChannel):
                 media_paths.append(str(file_path))
                 content_parts.append(f"[attachment: {file_path}]")
             except Exception as e:
-                logger.warning("[{}] 下载 Discord 附件失败: {}", self.name, e)
+                logger.warning("[{}] Failed to download Discord attachment: {}", self.name, e)
                 content_parts.append(f"[attachment: {filename} - download failed]")
 
         await self._start_typing(channel_id)
@@ -292,7 +302,7 @@ class DiscordChannel(BaseChannel):
             },
         ))
 
-    # ── Typing 指示器 ─────────────────────────────────────────────────────────
+    # ── Typing indicator ─────────────────────────────────────────────────────
 
     async def _start_typing(self, channel_id: str) -> None:
         await self._stop_typing(channel_id)

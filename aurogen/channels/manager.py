@@ -1,4 +1,4 @@
-"""ChannelManager：全局单例，负责 channel 注册、从 config 加载与动态重载。"""
+"""ChannelManager: global singleton for channel registration, loading from config, and dynamic reload."""
 
 from __future__ import annotations
 
@@ -16,15 +16,15 @@ if TYPE_CHECKING:
 
 @dataclass
 class ChannelTypeInfo:
-    """channel 类型的元信息，供 ChannelManager 和 API 使用。"""
+    """Metadata for a channel type, used by ChannelManager and API."""
     cls: type[BaseChannel]
     description: str = ""
     required_settings: list[str] = field(default_factory=list)
-    builtin: bool = False   # True 表示内置 channel，不暴露给 supported/add/delete API
+    builtin: bool = False   # True = built-in channel, not exposed to supported/add/delete API
 
 
 def _build_registry() -> dict[str, ChannelTypeInfo]:
-    """延迟导入，避免循环依赖。"""
+    """Lazy import to avoid circular dependencies."""
     from channels.web import WebChannel
     from channels.feishu import FeishuChannel
     from channels.qq import QQChannel
@@ -43,17 +43,17 @@ def _build_registry() -> dict[str, ChannelTypeInfo]:
         ),
         "feishu": ChannelTypeInfo(
             cls=FeishuChannel,
-            description="飞书 WebSocket channel",
+            description="Feishu WebSocket channel",
             required_settings=["app_id", "app_secret"],
         ),
         "qq": ChannelTypeInfo(
             cls=QQChannel,
-            description="QQ 私聊 channel (botpy)",
+            description="QQ DM channel (botpy)",
             required_settings=["app_id", "secret"],
         ),
         "dingtalk": ChannelTypeInfo(
             cls=DingTalkChannel,
-            description="钉钉 Stream channel",
+            description="DingTalk Stream channel",
             required_settings=["client_id", "client_secret"],
         ),
         "discord": ChannelTypeInfo(
@@ -64,8 +64,9 @@ def _build_registry() -> dict[str, ChannelTypeInfo]:
         "email": ChannelTypeInfo(
             cls=EmailChannel,
             description="Email IMAP/SMTP channel",
-            required_settings=["imap_host", "imap_username", "imap_password",
-                               "smtp_host", "smtp_username", "smtp_password"],
+            required_settings=["imap_host", "imap_port", "imap_username", "imap_password",
+                               "smtp_host", "smtp_port", "smtp_username", "smtp_password",
+                               "consent_granted"],
         ),
         "mochat": ChannelTypeInfo(
             cls=MochatChannel,
@@ -85,57 +86,57 @@ def _build_registry() -> dict[str, ChannelTypeInfo]:
         "whatsapp": ChannelTypeInfo(
             cls=WhatsAppChannel,
             description="WhatsApp channel (Baileys bridge)",
-            required_settings=["bridge_port"],
+            required_settings=[],
         ),
     }
 
 
 class ChannelManager:
     """
-    管理所有已注册的 channel。
+    Manages all registered channels.
 
-    职责：
-    - 出站消息路由：send(channel_name, chat_id, content)
-    - 从 config 批量实例化 channel：load_from_config()
-    - 运行时增量重载：reload()
-    - 状态查询：status()
+    Responsibilities:
+    - Outbound message routing: send(channel_name, chat_id, content)
+    - Bulk channel instantiation from config: load_from_config()
+    - Runtime incremental reload: reload()
+    - Status query: status()
     """
 
     def __init__(self):
         self._channels: dict[str, BaseChannel] = {}
-        # 记录每个 channel 对应的 asyncio Task（用于有后台循环的 channel）
+        # Tracks asyncio Task per channel (for channels with background loops)
         self._tasks: dict[str, asyncio.Task] = {}
 
-    # ── 基本操作 ──────────────────────────────────────────────────────────────
+    # ── Basic operations ──────────────────────────────────────────────────────
 
     def register(self, channel: BaseChannel) -> None:
-        """手动注册一个已实例化的 channel（无需 start）。"""
+        """Register an already-instantiated channel (no start required)."""
         self._channels[channel.name] = channel
 
     def get(self, channel_name: str) -> Optional[BaseChannel]:
-        """获取指定 channel 实例，不存在返回 None。"""
+        """Get the channel instance by name; returns None if not found."""
         return self._channels.get(channel_name)
 
     async def send(self, channel_name: str, chat_id: str, content: str) -> None:
-        """将消息路由到对应 channel 的 send() 方法。"""
+        """Route message to the corresponding channel's send() method."""
         channel = self._channels.get(channel_name)
         if channel is None:
-            logger.warning("[ChannelManager] 未知 channel: {}，消息丢弃", channel_name)
+            logger.warning("[ChannelManager] Unknown channel: {}, message dropped", channel_name)
             return
         await channel.send(chat_id, content)
 
     async def notify(self, channel_name: str, event: "AgentEvent") -> None:
-        """路由中间事件（THINKING/TOOL_CALL/TOOL_RESULT）到对应 channel 的 notify() 方法。"""
+        """Route intermediate events (THINKING/TOOL_CALL/TOOL_RESULT) to the channel's notify() method."""
         channel = self._channels.get(channel_name)
         if channel:
             await channel.notify(event)
 
-    # ── 从 config 加载 ────────────────────────────────────────────────────────
+    # ── Load from config ───────────────────────────────────────────────────────
 
     async def load_from_config(self) -> None:
         """
-        启动时读取全部 channel config，实例化并 start()。
-        等价于对每个 config 条目调用 _start_channel()。
+        On startup, read all channel configs, instantiate and start() each.
+        Equivalent to calling _start_channel() for each config entry.
         """
         from config.config import config_manager
         registry = _build_registry()
@@ -145,31 +146,31 @@ class ChannelManager:
             channel_type = cfg.get("type", key)
             info = registry.get(channel_type)
             if info is None:
-                logger.warning("[ChannelManager] 未知 channel 类型: {}，跳过", channel_type)
+                logger.warning("[ChannelManager] Unknown channel type: {}, skipping", channel_type)
                 continue
             await self._start_channel(key, info, cfg)
 
     async def _start_channel(self, key: str, info: ChannelTypeInfo, cfg: dict) -> None:
-        """实例化并 start() 一个 channel。"""
+        """Instantiate and start() a channel."""
         settings = cfg.get("settings", {})
         try:
             channel = info.cls(channel_key=key, settings=settings)
             self._channels[key] = channel
             await channel.start()
-            logger.info("[ChannelManager] channel '{}' 已启动", key)
+            logger.info("[ChannelManager] channel '{}' started", key)
         except Exception as e:
-            logger.error("[ChannelManager] 启动 channel '{}' 失败: {}", key, e)
+            logger.error("[ChannelManager] Failed to start channel '{}': {}", key, e)
 
-    # ── 动态重载 ──────────────────────────────────────────────────────────────
+    # ── Dynamic reload ────────────────────────────────────────────────────────
 
     async def reload(self) -> dict:
         """
-        对比当前运行的 channel 与最新 config，增量更新：
-        - 新增的 channel → start()
-        - 移除的 channel → stop()
-        - 已存在的 channel → 保持不变（避免断连）
+        Compare running channels with latest config and update incrementally:
+        - Added channels → start()
+        - Removed channels → stop()
+        - Existing channels → unchanged (avoid disconnects)
 
-        返回变更摘要 dict。
+        Returns a change summary dict.
         """
         from config.config import config_manager
         registry = _build_registry()
@@ -190,7 +191,7 @@ class ChannelManager:
             channel_type = cfg.get("type", key)
             info = registry.get(channel_type)
             if info is None:
-                logger.warning("[ChannelManager] 未知 channel 类型: {}，跳过", channel_type)
+                logger.warning("[ChannelManager] Unknown channel type: {}, skipping", channel_type)
                 continue
             await self._start_channel(key, info, cfg)
 
@@ -201,24 +202,24 @@ class ChannelManager:
         }
 
     async def _stop_channel(self, key: str) -> None:
-        """停止并注销一个 channel。"""
+        """Stop and unregister a channel."""
         channel = self._channels.pop(key, None)
         if channel:
             try:
                 await channel.stop()
-                logger.info("[ChannelManager] channel '{}' 已停止", key)
+                logger.info("[ChannelManager] channel '{}' stopped", key)
             except Exception as e:
-                logger.error("[ChannelManager] 停止 channel '{}' 失败: {}", key, e)
+                logger.error("[ChannelManager] Failed to stop channel '{}': {}", key, e)
 
     async def stop_all(self) -> None:
-        """停止所有已注册的 channel（应用关闭时调用）。"""
+        """Stop all registered channels (called on application shutdown)."""
         for key in list(self._channels.keys()):
             await self._stop_channel(key)
 
-    # ── 状态查询 ──────────────────────────────────────────────────────────────
+    # ── Status query ──────────────────────────────────────────────────────────
 
     def status(self) -> dict:
-        """返回当前已注册 channel 列表及其状态。"""
+        """Return the list of registered channels and their status."""
         return {
             "channels": [
                 {
@@ -231,13 +232,13 @@ class ChannelManager:
         }
 
 
-# ── 全局单例 ─────────────────────────────────────────────────────────────────
+# ── Global singleton ─────────────────────────────────────────────────────────
 
 _channel_manager: Optional[ChannelManager] = None
 
 
 def get_channel_manager() -> ChannelManager:
-    """获取全局 ChannelManager 实例。"""
+    """Get the global ChannelManager instance."""
     global _channel_manager
     if _channel_manager is None:
         _channel_manager = ChannelManager()
