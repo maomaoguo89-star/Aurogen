@@ -13,14 +13,14 @@ export type SystemStatus = {
   agent_loop_running: boolean
   heartbeat: {
     running: boolean
-    agent_name: string
-    interval_s: number
-    enabled: boolean
+    instances?: Record<string, {
+      running: boolean
+      interval_s: number
+      enabled: boolean
+    }>
   }
   cron: {
     running: boolean
-    agent_name: string
-    enabled: boolean
   }
   channels: ShellChannelStatus[]
   mcp: {

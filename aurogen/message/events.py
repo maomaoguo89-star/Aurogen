@@ -17,8 +17,8 @@ class EventType(Enum):
 class InboundMessage:
     """入站消息。"""
     session_id: str
-    # agent_name: str
     content: str
+    agent_name: str | None = None
     metadata: dict = field(default_factory=dict)
 
 

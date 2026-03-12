@@ -9,6 +9,7 @@ class AgentConfig(BaseModel):
     description: str
     provider: str
     emoji: str = ""
+    bootstrap_completed: bool = False
 
 
 class ProviderConfig(BaseModel):
@@ -44,13 +45,7 @@ class AuthConfig(BaseModel):
 
 
 class HeartbeatConfig(BaseModel):
-    agent_name: str = "main"
     interval_s: int = 1800
-    enabled: bool = True
-
-
-class CronConfig(BaseModel):
-    agent_name: str = "main"
     enabled: bool = True
 
 
@@ -60,5 +55,4 @@ class AppConfig(BaseModel):
     channels: Dict[str, ChannelConfig] = {}
     mcp: Dict[str, MCPServerConfig] = {}
     auth: AuthConfig = Field(default_factory=AuthConfig)
-    heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
-    cron: CronConfig = Field(default_factory=CronConfig)
+    heartbeat: Dict[str, HeartbeatConfig] = Field(default_factory=dict)

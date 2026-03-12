@@ -20,7 +20,6 @@ from app.schema import (
     SkillInfo,
     UpdateAgentRequest,
     UpdateChannelRequest,
-    UpdateCronConfigRequest,
     UpdateCronJobRequest,
     UpdateHeartbeatConfigRequest,
     UpdateMCPServerRequest,
@@ -34,6 +33,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from config.config import config_manager, WORKSPACE_DIR, TEMPLATE_DIR
+from config.schema import HeartbeatConfig
 from channels.manager import get_channel_manager, _build_registry
 from channels.web import WebChannel
 from message.queue_manager import get_inbound_queue
@@ -42,10 +42,12 @@ from message.session_manager import Session
 from core.core import AgentLoop
 from core.skills import SkillsLoader, get_skills_loader, resolve_skills_dir
 from providers.providers import Provider, _build_provider_registry
-from core.heartbeat import HeartbeatService
+from core.heartbeat import HeartbeatManager
 
 agent_loop: AgentLoop | None = None
-heartbeat_service: HeartbeatService | None = None
+heartbeat_manager: HeartbeatManager | None = None
+
+DEFAULT_HEARTBEAT_CONFIG = HeartbeatConfig().model_dump()
 
 
 def _ensure_main_agent():
@@ -66,12 +68,40 @@ def _ensure_main_agent():
             shutil.copy2(src, dst)
 
 
+def _ensure_agent_heartbeat_file(agent_name: str) -> None:
+    """Ensure the agent workspace has a default HEARTBEAT.md."""
+    template_file = TEMPLATE_DIR / "HEARTBEAT.md"
+    if not template_file.exists():
+        return
+    heartbeat_file = WORKSPACE_DIR / "agents" / agent_name / "HEARTBEAT.md"
+    if heartbeat_file.exists():
+        return
+    heartbeat_file.parent.mkdir(parents=True, exist_ok=True)
+    heartbeat_file.write_text(template_file.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def _get_heartbeat_agent_config(agent_name: str) -> dict:
+    cfg = config_manager.get(f"heartbeat.{agent_name}")
+    if isinstance(cfg, dict):
+        return {
+            "interval_s": cfg.get("interval_s", DEFAULT_HEARTBEAT_CONFIG["interval_s"]),
+            "enabled": cfg.get("enabled", DEFAULT_HEARTBEAT_CONFIG["enabled"]),
+        }
+    return dict(DEFAULT_HEARTBEAT_CONFIG)
+
+
+def _heartbeat_session_id(agent_name: str) -> str:
+    return f"web@heartbeat:{agent_name}"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI 生命周期管理：启动和关闭 agent loop 及所有 channel。"""
-    global agent_loop, heartbeat_service
+    global agent_loop, heartbeat_manager
 
     _ensure_main_agent()
+    for agent_name in config_manager.get("agents", {}):
+        _ensure_agent_heartbeat_file(agent_name)
 
     # 从 config 加载并启动所有 channel
     channel_manager = get_channel_manager()
@@ -80,32 +110,39 @@ async def lifespan(app: FastAPI):
     provider = Provider()
     agent_loop = AgentLoop(provider, workspace=WORKSPACE_DIR)
 
-    async def _on_execute(tasks: str) -> str:
-        msg = InboundMessage(session_id="web@heartbeat", content=tasks)
-        await get_inbound_queue().put(msg)
-        return f"Heartbeat task queued: {tasks[:80]}"
+    def _on_execute_factory(agent_name: str):
+        async def _on_execute(tasks: str) -> str:
+            msg = InboundMessage(
+                session_id=_heartbeat_session_id(agent_name),
+                content=tasks,
+                agent_name=agent_name,
+                metadata={"source": "heartbeat", "agent_name": agent_name},
+            )
+            await get_inbound_queue().put(msg)
+            return f"Heartbeat task queued for {agent_name}: {tasks[:80]}"
+        return _on_execute
 
-    async def _on_notify(response: str) -> None:
-        logger.info("Heartbeat result: {}", response)
+    def _on_notify_factory(agent_name: str):
+        async def _on_notify(response: str) -> None:
+            logger.info("Heartbeat [{}] result: {}", agent_name, response)
+        return _on_notify
 
-    hb_cfg = config_manager.get("heartbeat", {})
-    heartbeat_service = HeartbeatService(
-        workspace=WORKSPACE_DIR / "agents" / "main",
-        on_execute=_on_execute,
-        on_notify=_on_notify,
-        agent_name=hb_cfg.get("agent_name", "heartbeat"),
-        interval_s=hb_cfg.get("interval_s", 1800),
-        enabled=hb_cfg.get("enabled", True),
+    heartbeat_manager = HeartbeatManager(
+        workspace_root=WORKSPACE_DIR,
+        config_resolver=_get_heartbeat_agent_config,
+        on_execute_factory=_on_execute_factory,
+        on_notify_factory=_on_notify_factory,
     )
+    heartbeat_manager.sync_agents(config_manager.get("agents", {}).keys())
 
     task = asyncio.create_task(agent_loop.run())
-    await heartbeat_service.start()
+    await heartbeat_manager.start_all()
     logger.info("[App] Agent loop 已启动，已加载 channel: {}", list(channel_manager._channels.keys()))
 
     yield  # 应用运行中
 
     agent_loop.stop()
-    heartbeat_service.stop()
+    heartbeat_manager.stop_all()
     await channel_manager.stop_all()
     task.cancel()
     try:
@@ -343,26 +380,24 @@ async def reload_mcp():
 # ── Heartbeat 配置端点 ────────────────────────────────────────────────────────
 
 @app.get("/heartbeat/config")
-async def get_heartbeat_config():
-    """返回当前 heartbeat 配置。"""
-    cfg = config_manager.get("heartbeat", {})
+async def get_heartbeat_config(agent_name: str = "main"):
+    """返回指定 agent 的 heartbeat 配置。"""
+    _require_agent(agent_name)
+    cfg = _get_heartbeat_agent_config(agent_name)
     return {
-        "agent_name": cfg.get("agent_name", "heartbeat"),
-        "interval_s": cfg.get("interval_s", 1800),
-        "enabled": cfg.get("enabled", True),
+        "interval_s": cfg["interval_s"],
+        "enabled": cfg["enabled"],
     }
 
 
 @app.patch("/heartbeat/config")
-async def update_heartbeat_config(request: UpdateHeartbeatConfigRequest):
-    """部分更新 heartbeat 配置，并重启 heartbeat 服务使配置生效。"""
-    global heartbeat_service
-    existing = config_manager.get("heartbeat", {})
+async def update_heartbeat_config(request: UpdateHeartbeatConfigRequest, agent_name: str = "main"):
+    """部分更新指定 agent 的 heartbeat 配置，并重启对应实例使配置生效。"""
+    global heartbeat_manager
+    _require_agent(agent_name)
+    existing = _get_heartbeat_agent_config(agent_name)
     merged = dict(existing)
 
-    if request.agent_name is not None:
-        _require_agent(request.agent_name)
-        merged["agent_name"] = request.agent_name
     if request.interval_s is not None:
         if request.interval_s <= 0:
             raise HTTPException(status_code=400, detail="interval_s 必须大于 0")
@@ -370,44 +405,12 @@ async def update_heartbeat_config(request: UpdateHeartbeatConfigRequest):
     if request.enabled is not None:
         merged["enabled"] = request.enabled
 
-    config_manager.set("heartbeat", merged)
+    config_manager.set(f"heartbeat.{agent_name}", merged)
 
-    if heartbeat_service is not None:
-        heartbeat_service.stop()
-        heartbeat_service.agent_name = merged.get("agent_name", "heartbeat")
-        heartbeat_service.interval_s = merged.get("interval_s", 1800)
-        heartbeat_service.enabled = merged.get("enabled", True)
-        await heartbeat_service.start()
+    if heartbeat_manager is not None:
+        await heartbeat_manager.rebuild_agent(agent_name)
 
     return {"message": "heartbeat 配置已更新"}
-
-
-# ── Cron 配置端点 ─────────────────────────────────────────────────────────────
-
-@app.get("/cron/config")
-async def get_cron_config():
-    """返回当前 cron 配置。"""
-    cfg = config_manager.get("cron", {})
-    return {
-        "agent_name": cfg.get("agent_name", "main"),
-        "enabled": cfg.get("enabled", True),
-    }
-
-
-@app.patch("/cron/config")
-async def update_cron_config(request: UpdateCronConfigRequest):
-    """部分更新 cron 配置。"""
-    existing = config_manager.get("cron", {})
-    merged = dict(existing)
-
-    if request.agent_name is not None:
-        _require_agent(request.agent_name)
-        merged["agent_name"] = request.agent_name
-    if request.enabled is not None:
-        merged["enabled"] = request.enabled
-
-    config_manager.set("cron", merged)
-    return {"message": "cron 配置已更新"}
 
 
 # ── Cron Job 管理端点 ─────────────────────────────────────────────────────────
@@ -1044,6 +1047,7 @@ async def get_agent_detail(name: str):
 async def add_agent(request: AddAgentRequest):
     """创建新 agent：复制 template 并写入 config。"""
     import shutil
+    global heartbeat_manager
     if config_manager.get(f"agents.{request.name}"):
         raise HTTPException(status_code=400, detail=f"agent '{request.name}' 已存在")
 
@@ -1067,7 +1071,12 @@ async def add_agent(request: AddAgentRequest):
         "description": request.description,
         "provider": request.provider,
         "emoji": request.emoji,
+        "bootstrap_completed": False,
     })
+    config_manager.set(f"heartbeat.{request.name}", dict(DEFAULT_HEARTBEAT_CONFIG))
+    _ensure_agent_heartbeat_file(request.name)
+    if heartbeat_manager is not None:
+        await heartbeat_manager.rebuild_agent(request.name)
     return {"message": f"agent '{request.name}' 已创建"}
 
 
@@ -1091,10 +1100,42 @@ async def update_agent(name: str, request: UpdateAgentRequest):
     return {"message": f"agent '{name}' 已更新"}
 
 
+@app.post("/agents/{name}/reset")
+async def reset_agent(name: str):
+    """重置 agent 工作区：删除目录内容，从 template 重新复制，重置 bootstrap 状态。"""
+    import shutil
+    global heartbeat_manager
+    _require_agent(name)
+
+    agent_dir = WORKSPACE_DIR / "agents" / name
+    if agent_dir.exists():
+        shutil.rmtree(agent_dir)
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    for src in TEMPLATE_DIR.rglob("*"):
+        if src.suffix in (".py", ".pyc") or "__pycache__" in src.parts:
+            continue
+        dst = agent_dir / src.relative_to(TEMPLATE_DIR)
+        if src.is_dir():
+            dst.mkdir(parents=True, exist_ok=True)
+        else:
+            shutil.copy2(src, dst)
+    _ensure_agent_heartbeat_file(name)
+
+    existing_cfg = config_manager.get(f"agents.{name}", {})
+    existing_cfg["bootstrap_completed"] = False
+    config_manager.set(f"agents.{name}", existing_cfg)
+
+    if heartbeat_manager is not None:
+        await heartbeat_manager.rebuild_agent(name)
+
+    return {"message": f"agent '{name}' 工作区已重置"}
+
+
 @app.delete("/agents/{name}")
 async def delete_agent(name: str):
     """删除 agent（移除 config 并删除 workspace 目录）。内置 agent 不可删除。"""
     import shutil
+    global heartbeat_manager
     if name in BUILTIN_AGENTS:
         raise HTTPException(status_code=400, detail=f"agent '{name}' 为内置 agent，不可删除")
     if not config_manager.get(f"agents.{name}"):
@@ -1114,6 +1155,14 @@ async def delete_agent(name: str):
     if agent_dir.exists():
         shutil.rmtree(agent_dir)
 
+    if heartbeat_manager is not None:
+        heartbeat_manager.remove_agent(name)
+
+    heartbeat_cfg = config_manager.get("heartbeat", {})
+    if isinstance(heartbeat_cfg, dict):
+        heartbeat_cfg.pop(name, None)
+        config_manager.set("heartbeat", heartbeat_cfg)
+
     agents_cfg = config_manager.get("agents", {})
     agents_cfg.pop(name, None)
     config_manager.set("agents", agents_cfg)
@@ -1122,7 +1171,7 @@ async def delete_agent(name: str):
 
 # ── Agent Workspace Files ──────────────────────────────────────────────────────
 
-EDITABLE_AGENT_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "BOOTSTRAP.md"}
+EDITABLE_AGENT_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "BOOTSTRAP.md", "HEARTBEAT.md"}
 
 
 @app.get("/agents/{name}/files")
@@ -1407,21 +1456,13 @@ async def get_system_status():
             name for name in getattr(agent_loop.tools, "tool_names", [])
             if name.startswith("mcp_")
         ]
-    hb_cfg = config_manager.get("heartbeat", {})
-    cron_cfg = config_manager.get("cron", {})
+    heartbeat_status = heartbeat_manager.status() if heartbeat_manager else {"running": False, "instances": {}}
     return {
         "app": "ok",
         "agent_loop_running": bool(agent_loop and agent_loop._running),
-        "heartbeat": {
-            "running": bool(heartbeat_service and heartbeat_service._running),
-            "agent_name": hb_cfg.get("agent_name", "heartbeat"),
-            "interval_s": hb_cfg.get("interval_s", 1800),
-            "enabled": hb_cfg.get("enabled", True),
-        },
+        "heartbeat": heartbeat_status,
         "cron": {
             "running": bool(agent_loop and agent_loop.cron_service._running),
-            "agent_name": cron_cfg.get("agent_name", "main"),
-            "enabled": cron_cfg.get("enabled", True),
         },
         "channels": get_channel_manager().status()["channels"],
         "mcp": {

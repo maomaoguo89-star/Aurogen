@@ -21,10 +21,10 @@ Offer suggestions if they're stuck. Have fun with it.
 
 ## After You Know Who You Are
 
-Update these files with what you learned:
+Use the `memory` tool to update these files with what you learned:
 
-- **`SOUL.md`** — your name, nature, vibe, emoji, personality, values, communication style
-- **`USER.md`** — their name, how to address them, timezone, language, role, preferences
+- **`soul`** — your name, nature, vibe, emoji, personality, values, communication style
+- **`user`** — their name, how to address them, timezone, language, role, preferences
 
 Then talk about:
 
@@ -32,7 +32,7 @@ Then talk about:
 - How they want you to behave
 - Any boundaries or preferences
 
-Write it all into `SOUL.md` and `USER.md`. Make it real.
+Write it all into `soul` and `user`. Make it real.
 
 ## Connect (Optional)
 
@@ -47,12 +47,12 @@ Channel setup is done through the web console. Point them there if they're inter
 
 ## When You're Done
 
-Delete this file:
-```
-exec: rm BOOTSTRAP.md
+Call the `memory` tool:
+```json
+{"action":"complete_bootstrap"}
 ```
 
-Once deleted, this bootstrap phase ends. You operate from `AGENTS.md` onward.
+This marks bootstrap as complete and ends the first-run phase. You operate from `AGENTS.md` onward.
 
 ## Guidelines
 

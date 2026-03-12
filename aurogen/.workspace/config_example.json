@@ -3,12 +3,13 @@
         "main": {
             "name": "main",
             "description": "main agent",
-            "provider": "openai_custom",
-            "emoji": "🐾"
+            "provider": "default",
+            "emoji": "🐾",
+            "bootstrap_completed": false
         }
     },
     "providers": {
-        "openai_custom": {
+        "default": {
             "type": "openai_custom",
             "description": "openai compatible custom provider",
             "settings": {
@@ -36,12 +37,9 @@
         "first_login": true
     },
     "heartbeat": {
-        "agent_name": "main",
-        "interval_s": 1800,
-        "enabled": true
-    },
-    "cron": {
-        "agent_name": "main",
-        "enabled": true
+        "main": {
+            "interval_s": 1800,
+            "enabled": true
+        }
     }
 }

@@ -10,6 +10,7 @@ from channels.manager import get_channel_manager
 from config.config import config_manager
 from core.memory import MemoryStore
 from core.tools.cron import CronTool
+from core.tools.memory import MemoryTool
 from core.tools.mcp import connect_mcp_servers
 from core.tools.web import WebFetchTool, WebSearchTool
 from cron import CronJob, CronService
@@ -93,6 +94,7 @@ class AgentLoop:
         # self.tools.register(WebSearchTool()) # TODO: add api key
         self.tools.register(WebFetchTool(proxy=None))
         self.tools.register(CronTool(cron_service=self.cron_service))
+        self.tools.register(MemoryTool(workspace=self.workspace))
         self.tools.register(MessageTool())
 
     async def _setup_mcp(self) -> None:
@@ -150,7 +152,7 @@ class AgentLoop:
 
         try:
             # 获取或创建 session
-            session = Session(msg.session_id)
+            session = Session(msg.session_id, agent_name=msg.agent_name)
             agent_name = session.agent_name
             print(f"[AgentLoop] channel: {session.channel}, agent_name: {agent_name}")
 
@@ -163,6 +165,11 @@ class AgentLoop:
             msg_tool = self.tools.get("message")
             if msg_tool and isinstance(msg_tool, MessageTool):
                 msg_tool.set_context(session.channel, session.chat_id)
+
+            # 注入当前 agent 上下文到 MemoryTool
+            memory_tool = self.tools.get("memory")
+            if memory_tool and isinstance(memory_tool, MemoryTool):
+                memory_tool.set_context(agent_name)
 
             # 注入当前会话上下文到 SpawnTool
             spawn_tool = self.tools.get("spawn")
@@ -197,6 +204,7 @@ class AgentLoop:
             iteration = 0
             final_content = None
             message_tool_content: str | None = None
+            tool_summaries: list[str] = []
 
             while iteration < self.MAX_ITERATIONS:
                 iteration += 1
@@ -256,6 +264,20 @@ class AgentLoop:
                         if tool_name == "message" and "content" in tool_args:
                             message_tool_content = tool_args["content"]
 
+                        # bootstrap 完成后清空 session，避免 bootstrap 对话干扰后续
+                        if (tool_name == "memory"
+                                and tool_args.get("action") == "complete_bootstrap"
+                                and "already completed" not in result):
+                            session.messages = []
+                            session.last_consolidated = 0
+                            session._save_session()
+                            print(f"[AgentLoop] Bootstrap 完成，session 已清空")
+
+                        # 构建精简工具摘要用于持久化
+                        brief_args = {k: (v[:60] + "..." if isinstance(v, str) and len(v) > 60 else v) for k, v in tool_args.items()}
+                        brief_result = result[:200] + ("..." if len(result) > 200 else "")
+                        tool_summaries.append(f"[{tool_name}({brief_args}) -> {brief_result}]")
+
                         # 发送 TOOL_RESULT 事件
                         await get_channel_manager().notify(session.channel, AgentEvent(
                             session_id=msg.session_id,
@@ -287,8 +309,15 @@ class AgentLoop:
             if message_tool_content and (not final_content or not final_content.strip()):
                 final_content = message_tool_content
 
-            # 保存 assistant 回复到 session
-            session.add_message("assistant", final_content)
+            if not final_content or not final_content.strip():
+                final_content = "Done."
+
+            # 保存 assistant 回复到 session（附带精简工具摘要）
+            if tool_summaries:
+                tool_log = "\n".join(tool_summaries)
+                session.add_message("assistant", final_content, tool_summary=tool_log)
+            else:
+                session.add_message("assistant", final_content)
 
             # 通过 ChannelManager 路由最终回复到对应 channel
             # 如果 message 工具已经发送过相同内容，跳过重复发送

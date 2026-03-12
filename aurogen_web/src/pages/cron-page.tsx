@@ -3,7 +3,6 @@ import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
-  ChevronDown,
   CircleDashed,
   Clock,
   Edit3,
@@ -21,6 +20,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { fetchJson } from '@/lib/api'
+import { ThemedSelect } from '@/components/themed-select'
 
 // ── 类型定义 ────────────────────────────────────────────────────────────────────
 
@@ -286,18 +286,16 @@ function JobForm({
 
       <label className="block space-y-1.5">
         <span className="text-[11px] tracking-[0.06em] text-[var(--color-text-tertiary)]">{t('cron.scheduleType')}</span>
-        <div className="relative">
-          <select
-            className={`${inputCls} appearance-none pr-9`}
-            value={form.scheduleKind}
-            onChange={(e) => onChange({ scheduleKind: e.target.value as ScheduleKind })}
-          >
-            <option value="every">{t('cron.scheduleEvery')}</option>
-            <option value="cron">{t('cron.scheduleCron')}</option>
-            <option value="at">{t('cron.scheduleAt')}</option>
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-        </div>
+        <ThemedSelect
+          value={form.scheduleKind}
+          options={[
+            { value: 'every', label: t('cron.scheduleEvery') },
+            { value: 'cron', label: t('cron.scheduleCron') },
+            { value: 'at', label: t('cron.scheduleAt') },
+          ]}
+          onChange={(value) => onChange({ scheduleKind: value as ScheduleKind })}
+          buttonClassName={inputCls}
+        />
       </label>
 
       {form.scheduleKind === 'at' && (

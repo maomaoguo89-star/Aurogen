@@ -96,13 +96,7 @@ class SetPasswordRequest(BaseModel):
 
 
 class UpdateHeartbeatConfigRequest(BaseModel):
-    agent_name: Optional[str] = None
     interval_s: Optional[int] = None
-    enabled: Optional[bool] = None
-
-
-class UpdateCronConfigRequest(BaseModel):
-    agent_name: Optional[str] = None
     enabled: Optional[bool] = None
 
 

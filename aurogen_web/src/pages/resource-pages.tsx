@@ -11,6 +11,11 @@ export { ProvidersPage } from './providers-page'
 export function StatusPage() {
   const { status, summary, error } = useShellOverview()
   const { t } = useTranslation()
+  const heartbeatInstances = status?.heartbeat?.instances
+  const heartbeatTotal = heartbeatInstances ? Object.keys(heartbeatInstances).length : 0
+  const heartbeatRunning = heartbeatInstances
+    ? Object.values(heartbeatInstances).filter((instance) => instance.running).length
+    : 0
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
@@ -59,7 +64,11 @@ export function StatusPage() {
             />
             <StatusRow
               label="Heartbeat"
-              value={status?.heartbeat?.running ? 'running' : 'offline'}
+              value={
+                heartbeatTotal
+                  ? `${heartbeatRunning}/${heartbeatTotal} running`
+                  : (status?.heartbeat?.running ? 'running' : 'offline')
+              }
               active={Boolean(status?.heartbeat?.running)}
             />
           </div>

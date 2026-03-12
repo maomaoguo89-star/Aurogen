@@ -15,7 +15,7 @@ from core.skills import SkillsLoader
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
-    BOOTSTRAP_FILES = ["BOOTSTRAP.md", "AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"]
+    PROMPT_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
     def __init__(self, workspace: Path, agent_name: str):
@@ -28,9 +28,13 @@ class ContextBuilder:
         """Build the system prompt from identity, bootstrap files, and memory."""
         parts = [self._get_identity()]
 
-        bootstrap = self._load_bootstrap_files()
+        bootstrap = self._load_bootstrap_prompt()
         if bootstrap:
             parts.append(bootstrap)
+
+        prompt_files = self._load_prompt_files()
+        if prompt_files:
+            parts.append(prompt_files)
 
         memory = self._get_memory_context()
         if memory:
@@ -72,11 +76,21 @@ Your workspace is at: {workspace_path}
             return memory_file.read_text(encoding="utf-8")
         return ""
 
-    def _load_bootstrap_files(self) -> str:
-        """Load all bootstrap files from agent workspace."""
+    def _load_bootstrap_prompt(self) -> str:
+        """Load BOOTSTRAP.md only while bootstrap is incomplete."""
+        if config_manager.get(f"agents.{self.agent_name}.bootstrap_completed", False):
+            return ""
+
+        file_path = self.agent_workspace / "BOOTSTRAP.md"
+        if file_path.exists():
+            return file_path.read_text(encoding="utf-8")
+        return ""
+
+    def _load_prompt_files(self) -> str:
+        """Load persistent prompt files from agent workspace."""
         parts = []
 
-        for filename in self.BOOTSTRAP_FILES:
+        for filename in self.PROMPT_FILES:
             file_path = self.agent_workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
@@ -119,7 +133,7 @@ Your workspace is at: {workspace_path}
 class Session:
     """Session manager for conversation history."""
 
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, agent_name: str | None = None):
         self.session_id = session_id
         # session_id 格式：{channel_key}@{chat_id}
         # 用 "@" 分隔：既不会与 channel_key/chat_id 中的下划线冲突，也是合法的文件名字符（Windows 兼容）
@@ -128,11 +142,11 @@ class Session:
         self.chat_id = parts[1] if len(parts) > 1 else "unknown"
         
         # 获取 agent_name
-        agent_name = config_manager.get(f"channels.{self.channel}.agent_name", "main")
-        self.agent_name = agent_name
+        resolved_agent_name = agent_name or config_manager.get(f"channels.{self.channel}.agent_name", "main")
+        self.agent_name = resolved_agent_name
         
         # 初始化上下文构建器
-        self.context_builder = ContextBuilder(WORKSPACE_DIR, agent_name)
+        self.context_builder = ContextBuilder(WORKSPACE_DIR, resolved_agent_name)
         
         # 记忆整合相关属性
         self.last_consolidated = 0
@@ -163,8 +177,15 @@ class Session:
 
     @property
     def session_messages(self):
-        """向后兼容：返回 messages 的简化格式（不含 timestamp）"""
-        return [{"role": m["role"], "content": m["content"]} for m in self.messages]
+        """返回 messages 的简化格式，附带精简工具摘要供上下文使用。"""
+        result = []
+        for m in self.messages:
+            content = m["content"]
+            summary = m.get("tool_summary")
+            if summary and m["role"] == "assistant":
+                content = f"{content}\n\n<tool_log>\n{summary}\n</tool_log>" if content else f"<tool_log>\n{summary}\n</tool_log>"
+            result.append({"role": m["role"], "content": content})
+        return result
 
     def add_message(self, role: str, content: str, **kwargs):
         """Add a message to the session."""

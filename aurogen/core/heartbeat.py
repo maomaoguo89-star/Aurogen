@@ -5,11 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Iterable
 
 from loguru import logger
 
-from config.config import config_manager
 from providers.providers import Provider
 
 _HEARTBEAT_TOOL = [
@@ -184,3 +183,83 @@ class HeartbeatService:
         if action != "run" or not self.on_execute:
             return None
         return await self.on_execute(tasks)
+
+
+class HeartbeatManager:
+    """Manage one heartbeat service per agent."""
+
+    def __init__(
+        self,
+        workspace_root: Path,
+        config_resolver: Callable[[str], dict[str, Any]],
+        on_execute_factory: Callable[[str], Callable[[str], Coroutine[Any, Any, str]]],
+        on_notify_factory: Callable[[str], Callable[[str], Coroutine[Any, Any, None]]],
+    ):
+        self.workspace_root = workspace_root
+        self._config_resolver = config_resolver
+        self._on_execute_factory = on_execute_factory
+        self._on_notify_factory = on_notify_factory
+        self._services: dict[str, HeartbeatService] = {}
+
+    def _build_service(self, agent_name: str) -> HeartbeatService:
+        cfg = self._config_resolver(agent_name)
+        return HeartbeatService(
+            workspace=self.workspace_root / "agents" / agent_name,
+            on_execute=self._on_execute_factory(agent_name),
+            on_notify=self._on_notify_factory(agent_name),
+            agent_name=agent_name,
+            interval_s=cfg.get("interval_s", 1800),
+            enabled=cfg.get("enabled", True),
+        )
+
+    def sync_agents(self, agent_names: Iterable[str]) -> None:
+        """Reconcile managed services with configured agents."""
+        desired = set(agent_names)
+        for stale_agent in set(self._services) - desired:
+            self.remove_agent(stale_agent)
+        for agent_name in desired:
+            self._replace_service(agent_name)
+
+    def _replace_service(self, agent_name: str) -> HeartbeatService:
+        existing = self._services.pop(agent_name, None)
+        if existing:
+            existing.stop()
+        service = self._build_service(agent_name)
+        self._services[agent_name] = service
+        return service
+
+    async def start_all(self) -> None:
+        """Start all managed heartbeat services."""
+        for service in self._services.values():
+            await service.start()
+
+    def stop_all(self) -> None:
+        """Stop all managed heartbeat services."""
+        for service in self._services.values():
+            service.stop()
+
+    async def rebuild_agent(self, agent_name: str) -> None:
+        """Rebuild and restart the heartbeat service for one agent."""
+        service = self._replace_service(agent_name)
+        await service.start()
+
+    def remove_agent(self, agent_name: str) -> None:
+        """Stop and remove the heartbeat service for one agent."""
+        service = self._services.pop(agent_name, None)
+        if service:
+            service.stop()
+
+    def status(self) -> dict[str, Any]:
+        """Return aggregated heartbeat runtime status."""
+        instances = {}
+        for agent_name, service in sorted(self._services.items()):
+            cfg = self._config_resolver(agent_name)
+            instances[agent_name] = {
+                "running": service._running,
+                "interval_s": cfg.get("interval_s", service.interval_s),
+                "enabled": cfg.get("enabled", service.enabled),
+            }
+        return {
+            "running": any(item["running"] for item in instances.values()),
+            "instances": instances,
+        }

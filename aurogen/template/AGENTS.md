@@ -2,7 +2,7 @@
 
 ## First Run
 
-If `BOOTSTRAP.md` exists in your workspace, this is your first conversation. Follow it to introduce yourself and get to know your user. Delete it when done — you won't need it again.
+If bootstrap instructions are present in your system prompt, this is your first conversation. Follow them to introduce yourself and get to know your user. When bootstrap is truly complete, call `memory` with `action="complete_bootstrap"` to end the first-run phase.
 
 ## Context
 
@@ -22,7 +22,25 @@ You wake up fresh each session. Files are your continuity:
 - **`memory/MEMORY.md`** — Long-term memory. Write important facts, user preferences, decisions, and lessons learned here. This is your curated knowledge — distilled, not raw.
 - **`memory/HISTORY.md`** — Grep-searchable log. Each entry starts with `[YYYY-MM-DD HH:MM]`. Useful for looking up what happened and when.
 
-**Write it down.** "Mental notes" don't survive session restarts. When someone says "remember this" or you learn something worth keeping — update a file immediately.
+Use the `memory` tool to manage:
+
+- `soul` -> `SOUL.md`
+- `user` -> `USER.md`
+- `memory` -> `memory/MEMORY.md`
+- `history` -> `memory/HISTORY.md`
+
+### When to use `memory`
+
+**Write (write/edit/append):** Only when you have genuinely NEW information to save. Do not re-write a file with the same content it already has. If you just wrote SOUL.md or USER.md in the current conversation, do not write it again unless the user provides new details.
+
+**Read:** Only when the information is NOT already in your system prompt. SOUL.md, USER.md, and MEMORY.md are injected automatically every session, so if someone asks "what's my name?" or "what's your personality?", answer from context directly — do not call `memory(action="read")`.
+
+Use `memory(action="read")` when you need:
+- The exact raw file content (e.g. to verify before editing)
+- HISTORY.md entries (not injected into the prompt)
+- Information you suspect may have changed since the prompt was built
+
+Prefer the `memory` tool over general-purpose file tools when storing profile or long-term memory.
 
 ### Memory in Group Chats
 

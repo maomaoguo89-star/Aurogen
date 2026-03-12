@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertCircle,
-  ChevronDown,
-  Clock,
   Eye,
   EyeOff,
   KeyRound,
@@ -17,17 +15,12 @@ import {
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { fetchJson, AUTH_STORAGE_KEY } from '@/lib/api'
+import { ThemedSelect } from '@/components/themed-select'
 import { useTheme, type ThemePreference } from '@/features/theme/use-theme'
 import { useLocale } from '@/features/locale/use-locale'
 
 type HeartbeatConfig = {
-  agent_name: string
   interval_s: number
-  enabled: boolean
-}
-
-type CronConfig = {
-  agent_name: string
   enabled: boolean
 }
 
@@ -36,12 +29,8 @@ type AgentOption = {
   name: string
 }
 
-async function fetchHeartbeatConfig() {
-  return fetchJson<HeartbeatConfig>('/heartbeat/config')
-}
-
-async function fetchCronConfig() {
-  return fetchJson<CronConfig>('/cron/config')
+async function fetchHeartbeatConfig(agentName: string) {
+  return fetchJson<HeartbeatConfig>(`/heartbeat/config?agent_name=${encodeURIComponent(agentName)}`)
 }
 
 async function fetchAgentOptions() {
@@ -49,15 +38,8 @@ async function fetchAgentOptions() {
   return res.agents.map((a) => ({ key: a.key, name: a.name }))
 }
 
-async function updateHeartbeat(data: { agent_name?: string; interval_s?: number; enabled?: boolean }) {
-  return fetchJson<{ message: string }>('/heartbeat/config', {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  })
-}
-
-async function updateCron(data: { agent_name?: string; enabled?: boolean }) {
-  return fetchJson<{ message: string }>('/cron/config', {
+async function updateHeartbeat(agentName: string, data: { interval_s?: number; enabled?: boolean }) {
+  return fetchJson<{ message: string }>(`/heartbeat/config?agent_name=${encodeURIComponent(agentName)}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
@@ -72,23 +54,29 @@ async function changePassword(newPassword: string) {
 
 function useSettingsController() {
   const [heartbeat, setHeartbeat] = useState<HeartbeatConfig | null>(null)
-  const [cron, setCron] = useState<CronConfig | null>(null)
   const [agents, setAgents] = useState<AgentOption[]>([])
+  const [selectedHeartbeatAgent, setSelectedHeartbeatAgent] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [savingSection, setSavingSection] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (preferredAgent?: string) => {
     try {
-      const [hb, cr, ag] = await Promise.all([
-        fetchHeartbeatConfig(),
-        fetchCronConfig(),
-        fetchAgentOptions(),
-      ])
-      setHeartbeat(hb)
-      setCron(cr)
+      const ag = await fetchAgentOptions()
+      const nextAgent =
+        preferredAgent
+        || ag.find((agent) => agent.key === 'main')?.key
+        || ag[0]?.key
+        || ''
       setAgents(ag)
+      setSelectedHeartbeatAgent(nextAgent)
+      if (nextAgent) {
+        const hb = await fetchHeartbeatConfig(nextAgent)
+        setHeartbeat(hb)
+      } else {
+        setHeartbeat(null)
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载设置失败'
       setError(msg)
@@ -111,12 +99,25 @@ function useSettingsController() {
     setTimeout(() => setSuccessMessage(null), 2500)
   }, [])
 
-  const handleUpdateHeartbeat = useCallback(async (data: { agent_name?: string; interval_s?: number; enabled?: boolean }, tFn: (k: string) => string) => {
+  const handleSelectHeartbeatAgent = useCallback(async (agentName: string) => {
+    setSelectedHeartbeatAgent(agentName)
+    setError(null)
+    try {
+      const hb = await fetchHeartbeatConfig(agentName)
+      setHeartbeat(hb)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加载设置失败'
+      setError(msg)
+    }
+  }, [])
+
+  const handleUpdateHeartbeat = useCallback(async (data: { interval_s?: number; enabled?: boolean }, tFn: (k: string) => string) => {
+    if (!selectedHeartbeatAgent) return
     setSavingSection('heartbeat')
     setError(null)
     try {
-      await updateHeartbeat(data)
-      await reload()
+      await updateHeartbeat(selectedHeartbeatAgent, data)
+      await reload(selectedHeartbeatAgent)
       showSuccess(tFn('settings.heartbeatSaved'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : tFn('common.loadFailed')
@@ -124,22 +125,7 @@ function useSettingsController() {
     } finally {
       setSavingSection(null)
     }
-  }, [reload, showSuccess])
-
-  const handleUpdateCron = useCallback(async (data: { agent_name?: string; enabled?: boolean }, tFn: (k: string) => string) => {
-    setSavingSection('cron')
-    setError(null)
-    try {
-      await updateCron(data)
-      await reload()
-      showSuccess(tFn('settings.cronSaved'))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : tFn('common.loadFailed')
-      setError(msg)
-    } finally {
-      setSavingSection(null)
-    }
-  }, [reload, showSuccess])
+  }, [reload, selectedHeartbeatAgent, showSuccess])
 
   const handleChangePassword = useCallback(async (newPassword: string, tFn: (k: string) => string) => {
     setSavingSection('password')
@@ -158,15 +144,15 @@ function useSettingsController() {
 
   return {
     heartbeat,
-    cron,
     agents,
+    selectedHeartbeatAgent,
     loading,
     error,
     savingSection,
     successMessage,
     setError,
+    handleSelectHeartbeatAgent,
     handleUpdateHeartbeat,
-    handleUpdateCron,
     handleChangePassword,
   }
 }
@@ -175,15 +161,15 @@ export function SettingsPage() {
   const { t } = useTranslation()
   const {
     heartbeat,
-    cron,
     agents,
+    selectedHeartbeatAgent,
     loading,
     error,
     savingSection,
     successMessage,
     setError,
+    handleSelectHeartbeatAgent,
     handleUpdateHeartbeat,
-    handleUpdateCron,
     handleChangePassword,
   } = useSettingsController()
 
@@ -226,14 +212,10 @@ export function SettingsPage() {
           <HeartbeatCard
             config={heartbeat}
             agents={agents}
+            selectedAgent={selectedHeartbeatAgent}
+            onSelectAgent={handleSelectHeartbeatAgent}
             saving={savingSection === 'heartbeat'}
             onSave={(data) => handleUpdateHeartbeat(data, t)}
-          />
-          <CronCard
-            config={cron}
-            agents={agents}
-            saving={savingSection === 'cron'}
-            onSave={(data) => handleUpdateCron(data, t)}
           />
           <PasswordCard
             saving={savingSection === 'password'}
@@ -320,22 +302,24 @@ function AppearanceCard() {
 function HeartbeatCard({
   config,
   agents,
+  selectedAgent,
+  onSelectAgent,
   saving,
   onSave,
 }: {
   config: HeartbeatConfig | null
   agents: AgentOption[]
+  selectedAgent: string
+  onSelectAgent: (agentName: string) => void
   saving: boolean
-  onSave: (data: { agent_name?: string; interval_s?: number; enabled?: boolean }) => Promise<void>
+  onSave: (data: { interval_s?: number; enabled?: boolean }) => Promise<void>
 }) {
   const { t } = useTranslation()
-  const [agentName, setAgentName] = useState('')
   const [intervalS, setIntervalS] = useState('')
   const [enabled, setEnabled] = useState(true)
 
   useEffect(() => {
     if (config) {
-      setAgentName(config.agent_name)
       setIntervalS(String(config.interval_s))
       setEnabled(config.enabled)
     }
@@ -344,8 +328,7 @@ function HeartbeatCard({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!config) return
-    const payload: { agent_name?: string; interval_s?: number; enabled?: boolean } = {}
-    if (agentName !== config.agent_name) payload.agent_name = agentName
+    const payload: { interval_s?: number; enabled?: boolean } = {}
     const iv = parseInt(intervalS, 10)
     if (!isNaN(iv) && iv !== config.interval_s) payload.interval_s = iv
     if (enabled !== config.enabled) payload.enabled = enabled
@@ -373,7 +356,7 @@ function HeartbeatCard({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <FormField label="Agent">
-          <AgentSelect value={agentName} agents={agents} onChange={setAgentName} />
+          <AgentSelect value={selectedAgent} agents={agents} onChange={onSelectAgent} />
         </FormField>
         <FormField label={t('settings.intervalLabel')}>
           <input
@@ -385,68 +368,6 @@ function HeartbeatCard({
           />
         </FormField>
       </div>
-
-      <div className="flex items-center justify-between gap-4">
-        <EnableToggle enabled={enabled} onChange={setEnabled} />
-        <SaveButton saving={saving} />
-      </div>
-    </motion.form>
-  )
-}
-
-function CronCard({
-  config,
-  agents,
-  saving,
-  onSave,
-}: {
-  config: CronConfig | null
-  agents: AgentOption[]
-  saving: boolean
-  onSave: (data: { agent_name?: string; enabled?: boolean }) => Promise<void>
-}) {
-  const { t } = useTranslation()
-  const [agentName, setAgentName] = useState('')
-  const [enabled, setEnabled] = useState(true)
-
-  useEffect(() => {
-    if (config) {
-      setAgentName(config.agent_name)
-      setEnabled(config.enabled)
-    }
-  }, [config])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!config) return
-    const payload: { agent_name?: string; enabled?: boolean } = {}
-    if (agentName !== config.agent_name) payload.agent_name = agentName
-    if (enabled !== config.enabled) payload.enabled = enabled
-    if (Object.keys(payload).length === 0) return
-    await onSave(payload)
-  }
-
-  return (
-    <motion.form
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: 0.06 }}
-      onSubmit={(e) => { void handleSubmit(e) }}
-      className="panel-surface flex flex-col gap-5 p-5"
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
-          <Clock className="h-4 w-4 text-[var(--color-accent)]" />
-        </div>
-        <div>
-          <h3 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('settings.cronTitle')}</h3>
-          <p className="text-[11px] tertiary-text">{t('settings.cronDesc')}</p>
-        </div>
-      </div>
-
-      <FormField label="Agent">
-        <AgentSelect value={agentName} agents={agents} onChange={setAgentName} />
-      </FormField>
 
       <div className="flex items-center justify-between gap-4">
         <EnableToggle enabled={enabled} onChange={setEnabled} />
@@ -566,20 +487,12 @@ function AgentSelect({
   onChange: (v: string) => void
 }) {
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-4 py-2 pr-9 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-      >
-        {agents.map((a) => (
-          <option key={a.key} value={a.key}>
-            {a.key} ({a.name})
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-    </div>
+    <ThemedSelect
+      value={value}
+      options={agents.map((a) => ({ value: a.key, label: `${a.key} (${a.name})` }))}
+      onChange={onChange}
+      buttonClassName="px-4 py-2 text-[13px]"
+    />
   )
 }
 

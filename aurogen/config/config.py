@@ -48,7 +48,10 @@ class ConfigManager:
             if self.config_path.exists():
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                migrated, data = self._migrate_model_settings(data)
+                migrated_model, data = self._migrate_model_settings(data)
+                migrated_heartbeat, data = self._migrate_heartbeat_settings(data)
+                migrated_bootstrap, data = self._migrate_bootstrap_settings(data)
+                migrated = migrated_model or migrated_heartbeat or migrated_bootstrap
                 self._config = AppConfig(**data)
                 if migrated:
                     with open(self.config_path, "w", encoding="utf-8") as f:
@@ -116,6 +119,66 @@ class ConfigManager:
         data["providers"] = providers
         logger.info("[Config] model_settings 迁移完成")
         return True, data
+
+    @staticmethod
+    def _migrate_heartbeat_settings(data: dict) -> tuple[bool, dict]:
+        """Migrate single heartbeat config into per-agent heartbeat configs."""
+        heartbeat = data.get("heartbeat")
+        agents = data.get("agents", {})
+        if not isinstance(heartbeat, dict):
+            return False, data
+
+        is_legacy_shape = any(key in heartbeat for key in ("agent_name", "interval_s", "enabled"))
+        if not is_legacy_shape:
+            return False, data
+
+        default_cfg = {
+            "interval_s": 1800,
+            "enabled": True,
+        }
+        target_agent = heartbeat.get("agent_name")
+        if not isinstance(target_agent, str) or target_agent not in agents:
+            target_agent = "main" if "main" in agents else next(iter(agents), "main")
+
+        migrated_heartbeat = {
+            agent_key: dict(default_cfg)
+            for agent_key in agents
+        }
+        migrated_heartbeat[target_agent] = {
+            "interval_s": heartbeat.get("interval_s", default_cfg["interval_s"]),
+            "enabled": heartbeat.get("enabled", default_cfg["enabled"]),
+        }
+        data["heartbeat"] = migrated_heartbeat
+        return True, data
+
+    @staticmethod
+    def _migrate_bootstrap_settings(data: dict) -> tuple[bool, dict]:
+        """Ensure every agent has an explicit bootstrap completion flag."""
+        agents = data.get("agents", {})
+        if not isinstance(agents, dict):
+            return False, data
+
+        migrated = False
+        for agent_key, agent_cfg in agents.items():
+            if not isinstance(agent_cfg, dict) or "bootstrap_completed" in agent_cfg:
+                continue
+
+            bootstrap_file = WORKSPACE_DIR / "agents" / agent_key / "BOOTSTRAP.md"
+            bootstrap_completed = False
+            if not bootstrap_file.exists():
+                bootstrap_completed = True
+            else:
+                try:
+                    content = bootstrap_file.read_text(encoding="utf-8").strip()
+                    bootstrap_completed = content.startswith("# Bootstrap Complete")
+                except Exception:
+                    bootstrap_completed = False
+
+            agent_cfg["bootstrap_completed"] = bootstrap_completed
+            migrated = True
+
+        data["agents"] = agents
+        return migrated, data
 
     def _save(self) -> None:
         """保存配置到文件"""

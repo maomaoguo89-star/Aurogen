@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
+  import {
   AlertCircle,
-  ChevronDown,
   FileText,
   LoaderCircle,
   Plus,
+  RotateCcw,
   Save,
   Search,
   Shield,
@@ -13,6 +13,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { fetchJson } from '@/lib/api'
+import { ThemedSelect } from '@/components/themed-select'
 import { cn } from '@/lib/utils'
 
 type AgentInstance = {
@@ -122,6 +123,12 @@ async function deleteAgent(name: string) {
   })
 }
 
+async function resetAgent(name: string) {
+  return fetchJson<{ message: string }>(`/agents/${encodeURIComponent(name)}/reset`, {
+    method: 'POST',
+  })
+}
+
 function getAgentChannels(agentKey: string, channels: ChannelRef[]): string[] {
   return channels.filter((ch) => ch.agent_name === agentKey).map((ch) => ch.key)
 }
@@ -224,6 +231,23 @@ function useAgentsController() {
     }
   }, [reload, selectedKey])
 
+  const [resetting, setResetting] = useState(false)
+
+  const handleReset = useCallback(async (name: string) => {
+    setResetting(true)
+    setError(null)
+    try {
+      await resetAgent(name)
+      await reload()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to reset claw'
+      setError(msg)
+      throw err
+    } finally {
+      setResetting(false)
+    }
+  }, [reload])
+
   return {
     agents,
     providerOptions,
@@ -234,11 +258,13 @@ function useAgentsController() {
     error,
     saving,
     deleting,
+    resetting,
     setSelectedKey,
     setError,
     handleAdd,
     handleUpdate,
     handleDelete,
+    handleReset,
   }
 }
 
@@ -254,16 +280,19 @@ export function AgentsPage() {
     error,
     saving,
     deleting,
+    resetting,
     setSelectedKey,
     setError,
     handleAdd,
     handleUpdate,
     handleDelete,
+    handleReset,
   } = useAgentsController()
 
   const [searchValue, setSearchValue] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null)
+  const [pendingResetKey, setPendingResetKey] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
 
   const drawerOpen = selectedKey !== null
@@ -414,6 +443,9 @@ export function AgentsPage() {
           onDelete={() => {
             if (selectedAgent) setPendingDeleteKey(selectedAgent.key)
           }}
+          onReset={() => {
+            if (selectedAgent) setPendingResetKey(selectedAgent.key)
+          }}
         />
       </div>
 
@@ -425,6 +457,23 @@ export function AgentsPage() {
         onSubmit={async (data) => {
           await handleAdd(data)
           setShowAddModal(false)
+        }}
+      />
+
+      <ConfirmResetModal
+        agentKey={pendingResetKey}
+        isBusy={resetting}
+        onCancel={() => {
+          if (!resetting) setPendingResetKey(null)
+        }}
+        onConfirm={async () => {
+          if (!pendingResetKey) return
+          try {
+            await handleReset(pendingResetKey)
+            setPendingResetKey(null)
+          } catch {
+            /* error already set */
+          }
         }}
       />
 
@@ -465,6 +514,7 @@ function ClawDrawer({
   onCancelEdit,
   onSave,
   onDelete,
+  onReset,
 }: {
   open: boolean
   agent: AgentInstance | null
@@ -477,6 +527,7 @@ function ClawDrawer({
   onCancelEdit: () => void
   onSave: (data: { display_name?: string; description?: string; provider?: string; emoji?: string }) => Promise<void>
   onDelete: () => void
+  onReset: () => void
 }) {
   useEffect(() => {
     if (!open) return
@@ -537,6 +588,7 @@ function ClawDrawer({
                 channelRefs={channelRefs}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onReset={onReset}
               />
             )}
           </div>
@@ -553,11 +605,13 @@ function ClawDetail({
   channelRefs,
   onEdit,
   onDelete,
+  onReset,
 }: {
   agent: AgentInstance
   channelRefs: ChannelRef[]
   onEdit: () => void
   onDelete: () => void
+  onReset: () => void
 }) {
   const { t } = useTranslation()
   const usedByChannels = getAgentChannels(agent.key, channelRefs)
@@ -663,6 +717,14 @@ function ClawDetail({
             className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent-hover)]"
           >
             {t('common.edit')}
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[color:var(--color-warning)]/30 bg-[color:var(--color-warning)]/10 px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-warning)] transition hover:bg-[color:var(--color-warning)]/20"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {t('claws.reset')}
           </button>
           {!agent.builtin ? (
             <button
@@ -883,20 +945,15 @@ function ClawEditor({
           />
         </FormField>
         <FormField label="Brain *">
-          <div className="relative">
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-3 py-1.5 pr-8 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-            >
-              {providerOptions.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.key}{p.model ? ` \u00B7 ${p.model}` : ''} ({p.type})
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-          </div>
+          <ThemedSelect
+            value={provider}
+            options={providerOptions.map((p) => ({
+              value: p.key,
+              label: `${p.key}${p.model ? ` · ${p.model}` : ''} (${p.type})`,
+            }))}
+            onChange={setProvider}
+            buttonClassName="px-3 py-1.5 text-[13px]"
+          />
         </FormField>
         <FormField label="Description">
           <input
@@ -974,7 +1031,6 @@ function AddClawModal({
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] px-4 backdrop-blur-[2px]"
           role="presentation"
-          onClick={() => { if (!saving) onClose() }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
@@ -1031,20 +1087,15 @@ function AddClawModal({
               </FormField>
 
               <FormField label="Brain *">
-                <div className="relative">
-                  <select
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
-                    className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-4 py-2 pr-9 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-                  >
-                    {providerOptions.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.key}{p.model ? ` \u00B7 ${p.model}` : ''} ({p.type})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-                </div>
+                <ThemedSelect
+                  value={provider}
+                  options={providerOptions.map((p) => ({
+                    value: p.key,
+                    label: `${p.key}${p.model ? ` · ${p.model}` : ''} (${p.type})`,
+                  }))}
+                  onChange={setProvider}
+                  buttonClassName="px-4 py-2 text-[13px]"
+                />
               </FormField>
 
               <div className="flex items-center justify-end gap-3 pt-1">
@@ -1074,6 +1125,81 @@ function AddClawModal({
 }
 
 // ── Delete Modal ────────────────────────────────────────────────────────────────
+
+function ConfirmResetModal({
+  agentKey,
+  isBusy,
+  onCancel,
+  onConfirm,
+}: {
+  agentKey: string | null
+  isBusy: boolean
+  onCancel: () => void
+  onConfirm: () => void | Promise<void>
+}) {
+  const { t } = useTranslation()
+  return (
+    <AnimatePresence>
+      {agentKey ? (
+        <motion.div
+          key="reset-claw-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] px-4 backdrop-blur-[2px]"
+          role="presentation"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+            className="panel-surface w-full max-w-md p-5 shadow-[var(--shadow-lg)]"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] tracking-[0.06em] tertiary-text">Reset Claw</p>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                {t('claws.resetConfirmTitle')}
+              </h3>
+              <p className="text-sm subtle-text">
+                {t('claws.resetConfirmDesc')}
+              </p>
+            </div>
+
+            <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 px-4 py-3">
+              <p className="text-[11px] tracking-[0.06em] tertiary-text">Claw Key</p>
+              <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)]">{agentKey}</p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isBusy}
+                className="rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/50 px-4 py-2 text-[13px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-active)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void onConfirm() }}
+                disabled={isBusy}
+                className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/15 px-4 py-2 text-[13px] font-medium text-[var(--color-warning)] transition hover:bg-[color:var(--color-warning)]/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                {t('claws.reset')}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  )
+}
 
 function ConfirmDeleteModal({
   agentKey,

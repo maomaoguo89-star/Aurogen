@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   Eye,
   EyeOff,
   LoaderCircle,
@@ -15,6 +14,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { fetchJson } from '@/lib/api'
+import { ThemedSelect } from '@/components/themed-select'
 import { cn } from '@/lib/utils'
 
 type ThinkingLevel = 'none' | 'low' | 'medium' | 'high'
@@ -845,18 +845,12 @@ function ProviderEditor({
 
       <div className="grid grid-cols-3 gap-3">
         <FormField label="Type">
-          <div className="relative">
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-3 py-1.5 pr-8 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-            >
-              {supportedTypes.map((st) => (
-                <option key={st.type} value={st.type}>{st.type}</option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-          </div>
+          <ThemedSelect
+            value={type}
+            options={supportedTypes.map((st) => ({ value: st.type, label: st.type }))}
+            onChange={setType}
+            buttonClassName="px-3 py-1.5 text-[13px]"
+          />
         </FormField>
         <FormField label="Description" colSpan={2}>
           <input
@@ -887,19 +881,17 @@ function ProviderEditor({
           />
         </FormField>
         <FormField label="Thinking">
-          <div className="relative">
-            <select
-              value={thinking}
-              onChange={(e) => setThinking(e.target.value as ThinkingLevel)}
-              className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-3 py-1.5 pr-8 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-            >
-              <option value="none">none</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-          </div>
+          <ThemedSelect
+            value={thinking}
+            options={[
+              { value: 'none', label: 'none' },
+              { value: 'low', label: 'low' },
+              { value: 'medium', label: 'medium' },
+              { value: 'high', label: 'high' },
+            ]}
+            onChange={(value) => setThinking(value as ThinkingLevel)}
+            buttonClassName="px-3 py-1.5 text-[13px]"
+          />
         </FormField>
       </div>
 
@@ -1046,7 +1038,6 @@ function AddBrainModal({
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] px-4 backdrop-blur-[2px]"
           role="presentation"
-          onClick={() => { if (!saving) onClose() }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
@@ -1084,21 +1075,15 @@ function AddBrainModal({
                   />
                 </FormField>
                 <FormField label="Type *">
-                  <div className="relative">
-                    <select
-                      value={type}
-                      onChange={(e) => {
-                        setType(e.target.value)
-                        setSettings({})
-                      }}
-                      className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-4 py-2 pr-9 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-                    >
-                      {supportedTypes.map((st) => (
-                        <option key={st.type} value={st.type}>{st.type} — {st.description}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-                  </div>
+                  <ThemedSelect
+                    value={type}
+                    options={supportedTypes.map((st) => ({ value: st.type, label: `${st.type} — ${st.description}` }))}
+                    onChange={(value) => {
+                      setType(value)
+                      setSettings({})
+                    }}
+                    buttonClassName="px-4 py-2 text-[13px]"
+                  />
                 </FormField>
               </div>
 
@@ -1132,19 +1117,17 @@ function AddBrainModal({
                     />
                   </FormField>
                   <FormField label="Thinking">
-                    <div className="relative">
-                      <select
-                        value={thinking}
-                        onChange={(e) => setThinking(e.target.value as ThinkingLevel)}
-                        className="w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-4 py-2 pr-9 text-[13px] text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
-                      >
-                        <option value="none">none</option>
-                        <option value="low">low</option>
-                        <option value="medium">medium</option>
-                        <option value="high">high</option>
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
-                    </div>
+                    <ThemedSelect
+                      value={thinking}
+                      options={[
+                        { value: 'none', label: 'none' },
+                        { value: 'low', label: 'low' },
+                        { value: 'medium', label: 'medium' },
+                        { value: 'high', label: 'high' },
+                      ]}
+                      onChange={(value) => setThinking(value as ThinkingLevel)}
+                      buttonClassName="px-4 py-2 text-[13px]"
+                    />
                   </FormField>
                 </div>
               </div>
