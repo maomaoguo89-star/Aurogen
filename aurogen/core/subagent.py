@@ -11,7 +11,7 @@ from loguru import logger
 from core.tools.registry import ToolRegistry
 from core.tools.filesystem import ReadFileTool, WriteFileTool, EditFileTool, ListDirTool
 from core.tools.shell import ExecTool
-from core.tools.web import WebFetchTool
+from core.tools.web import WebFetchTool, WebSearchTool
 from message.events import InboundMessage
 from message.queue_manager import get_inbound_queue
 from providers.base import AdapterResponse
@@ -78,6 +78,7 @@ class SubagentManager:
                 restrict_to_workspace=False,
                 path_append="",
             ))
+            tools.register(WebSearchTool(proxy=None))
             tools.register(WebFetchTool(proxy=None))
 
             system_prompt = self._build_subagent_prompt(agent_workspace)

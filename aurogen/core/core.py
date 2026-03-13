@@ -109,7 +109,7 @@ class AgentLoop:
                 path_append="",
             )
         )
-        # self.tools.register(WebSearchTool()) # TODO: add api key
+        self.tools.register(WebSearchTool(proxy=None))
         self.tools.register(WebFetchTool(proxy=None))
         self.tools.register(CronTool(cron_service=self.cron_service))
         self.tools.register(MemoryTool(workspace=self.workspace))

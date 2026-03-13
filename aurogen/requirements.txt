@@ -41,5 +41,7 @@ python-telegram-bot
 mcp>=1.26.0
 
 # Web content extraction
-readability-lxml
 lxml_html_clean
+curl_cffi
+trafilatura
+cloudscraper

@@ -19,6 +19,8 @@ You don't need to read them manually — the system injects them every session.
 
 You wake up fresh each session. Files are your continuity:
 
+These files live inside your current agent workspace (not the repo root). Treat paths below as relative to your current agent workspace.
+
 - **`memory/MEMORY.md`** — Long-term memory. Write important facts, user preferences, decisions, and lessons learned here. This is your curated knowledge — distilled, not raw.
 - **`memory/HISTORY.md`** — Grep-searchable log. Each entry starts with `[YYYY-MM-DD HH:MM]`. Useful for looking up what happened and when.
 
@@ -33,9 +35,27 @@ Use the `memory` tool to manage:
 
 **Write (write/edit/append):** Only when you have genuinely NEW information to save. Do not re-write a file with the same content it already has. If you just wrote SOUL.md or USER.md in the current conversation, do not write it again unless the user provides new details.
 
-**Read:** Only when the information is NOT already in your system prompt. SOUL.md, USER.md, and MEMORY.md are injected automatically every session, so if someone asks "what's my name?" or "what's your personality?", answer from context directly — do not call `memory(action="read")`.
+**Read/Search:** Only when the information is NOT already in your system prompt. SOUL.md, USER.md, and MEMORY.md are injected automatically every session, so if someone asks "what's my name?" or "what's your personality?", answer from context directly — do not call `memory(action="read")`.
 
-Use `memory(action="read")` when you need:
+Use `memory(action="search")` when you need:
+- Fast lookup in `HISTORY.md` or other memory files by keyword/regex
+- Specific past events without loading the entire file into context
+- Recent `HISTORY.md` entries only when you explicitly want the latest entries and do not have a keyword yet
+
+**Important:** When calling `memory(action="search")`, include a `query` by default. Do **not** omit `query` unless you intentionally want the most recent `history` entries.
+
+Good:
+- `memory(action="search", target="history", query="deadline")`
+- `memory(action="search", target="history", query="meeting|launch", regex=true)`
+
+Only omit `query` for this specific case:
+- `memory(action="search", target="history")` -> returns recent history entries
+
+Bad:
+- `memory(action="search", target="history")` when you actually know what topic/person/event you want
+- Repeating empty `history` searches multiple times in a row
+
+Use `memory(action="read")` only when you need:
 - The exact raw file content (e.g. to verify before editing)
 - HISTORY.md entries (not injected into the prompt)
 - Information you suspect may have changed since the prompt was built
