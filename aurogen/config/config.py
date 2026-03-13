@@ -9,6 +9,7 @@ from config.schema import AppConfig, AgentConfig, ProviderConfig
 BASE_DIR = Path(__file__).resolve().parent.parent
 WORKSPACE_DIR = BASE_DIR / ".workspace"
 TEMPLATE_DIR = BASE_DIR / "template"
+WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class ConfigManager:

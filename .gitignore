@@ -27,10 +27,9 @@ dist-ssr
 # 忽略配置文件
 config.json
 
-# ignore sessions and agents
+# ignore workspace runtime data
 sessions/
-aurogen/.workspace/agents/main/**
-aurogen/.workspace/cron/jobs.json
+aurogen/.workspace/
 
 # Python 缓存
 __pycache__/

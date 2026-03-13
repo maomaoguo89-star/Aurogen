@@ -199,9 +199,7 @@ if errorlevel 1 (
     echo [error] Backend copy failed
     goto :fail
 )
-del /q "%PACKAGE_DIR%\aurogen\.workspace\config.json" 2>nul
-if exist "%PACKAGE_DIR%\aurogen\.workspace\agents\main" rmdir /s /q "%PACKAGE_DIR%\aurogen\.workspace\agents\main"
-del /q "%PACKAGE_DIR%\aurogen\.workspace\cron\jobs.json" 2>nul
+if exist "%PACKAGE_DIR%\aurogen\.workspace" rmdir /s /q "%PACKAGE_DIR%\aurogen\.workspace"
 
 echo [build] Copy frontend dist...
 mkdir "%PACKAGE_DIR%\aurogen_web" 2>nul

@@ -3,13 +3,13 @@
         "main": {
             "name": "main",
             "description": "main agent",
-            "provider": "openai_custom",
+            "provider": "default",
             "emoji": "🐾",
             "bootstrap_completed": false
         }
     },
     "providers": {
-        "openai_custom": {
+        "default": {
             "type": "openai_custom",
             "description": "openai compatible custom provider",
             "settings": {
@@ -33,7 +33,7 @@
     },
     "mcp": {},
     "auth": {
-        "password": "pwd",
+        "password": "",
         "first_login": true
     },
     "heartbeat": {
@@ -41,5 +41,12 @@
             "interval_s": 1800,
             "enabled": true
         }
+    },
+    "leader_agent": {
+        "provider": "default"
+    },
+    "runtime": {
+        "agent_loop_max_iterations": 40,
+        "group_max_turns": 12
     }
 }
