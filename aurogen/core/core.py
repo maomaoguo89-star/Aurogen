@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,16 @@ from core.tools.message import MessageTool
 from core.tools.shell import ExecTool
 from core.tools.spawn import SpawnTool
 from core.subagent import SubagentManager
+
+
+def _normalize_command_text(content: str) -> str:
+    """Normalize command text from chat channels that may inject mentions/zero-width chars."""
+    text = content.strip()
+    text = re.sub(r"[\u200b-\u200d\ufeff]", "", text)
+    text = re.sub(r"<at\b[^>]*>.*?</at>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r"@[\w.\-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 class AgentLoop:
@@ -52,6 +63,7 @@ class AgentLoop:
         self.tools = ToolRegistry()
         self.workspace = Path(workspace).resolve()
         self.restrict_to_workspace = False
+        self._session_locks: dict[str, asyncio.Lock] = {}
         self.cron_service = CronService(
             self.workspace / "cron" / "jobs.json",
             on_job=self._handle_cron_job,
@@ -139,7 +151,7 @@ class AgentLoop:
                     continue
 
                 # 异步处理消息
-                asyncio.create_task(self._process_message(msg))
+                asyncio.create_task(self._process_message_serialized(msg))
         finally:
             if self._mcp_stack:
                 await self._mcp_stack.aclose()
@@ -150,6 +162,19 @@ class AgentLoop:
         self._running = False
         self.cron_service.stop()
         print("[AgentLoop] 停止中...")
+
+    def _get_session_lock(self, session_id: str) -> asyncio.Lock:
+        lock = self._session_locks.get(session_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._session_locks[session_id] = lock
+        return lock
+
+    async def _process_message_serialized(self, msg: InboundMessage) -> None:
+        """Serialize processing per session to avoid stale session overwrites."""
+        lock = self._get_session_lock(msg.session_id)
+        async with lock:
+            await self._process_message(msg)
 
     async def _process_message(self, msg: InboundMessage) -> None:
         """处理单条消息，包含多轮 tool 调用。"""
@@ -183,8 +208,9 @@ class AgentLoop:
                 spawn_tool.set_context(session.channel, session.chat_id, agent_name)
 
             # 检查是否是手动触发记忆整合命令
-            if msg.content.strip() == "/new":
-                print("[AgentLoop] 手动触发记忆整合: /new")
+            normalized_content = _normalize_command_text(msg.content)
+            if normalized_content == "/new":
+                print(f"[AgentLoop] 手动触发记忆整合: {msg.content!r} -> {normalized_content!r}")
                 memory_store = MemoryStore(self.workspace, agent_name)
                 success = await memory_store.consolidate(session, self.provider, archive_all=True)
 
