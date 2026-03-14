@@ -295,16 +295,17 @@ class AgentLoop:
 
         # Cron/heartbeat messages are system-triggered events, not real user messages.
         # Storing them as "user" would pollute the session and confuse memory consolidation.
-        # Instead, inject them only into the current LLM call without persisting.
         source = msg.metadata.get("source", "")
         is_system_triggered = source in ("cron", "heartbeat")
 
-        if is_system_triggered:
-            # Build context from existing history, then append the trigger as a transient user turn
-            messages = session.get_context_with_message(msg.content)
-        else:
+        # Build context BEFORE adding the user message to session.
+        # This ensures the current message appears exactly once in the LLM context
+        # (as current_message in build_messages, not in session_messages).
+        messages = session.get_context_with_message(msg.content)
+
+        # Persist user message only for real conversational turns.
+        if not is_system_triggered:
             session.add_message("user", msg.content)
-            messages = session.get_context()
         print(f"[AgentLoop] Agent name: {agent_name}")
 
         iteration = 0
