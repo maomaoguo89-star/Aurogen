@@ -293,8 +293,18 @@ class AgentLoop:
                 session_id=msg.session_id,
             )
 
-        session.add_message("user", msg.content)
-        messages = session.get_context()
+        # Cron/heartbeat messages are system-triggered events, not real user messages.
+        # Storing them as "user" would pollute the session and confuse memory consolidation.
+        # Instead, inject them only into the current LLM call without persisting.
+        source = msg.metadata.get("source", "")
+        is_system_triggered = source in ("cron", "heartbeat")
+
+        if is_system_triggered:
+            # Build context from existing history, then append the trigger as a transient user turn
+            messages = session.get_context_with_message(msg.content)
+        else:
+            session.add_message("user", msg.content)
+            messages = session.get_context()
         print(f"[AgentLoop] Agent name: {agent_name}")
 
         iteration = 0
@@ -412,6 +422,9 @@ class AgentLoop:
         if not final_content or not final_content.strip():
             final_content = "Done."
 
+        # Always persist the assistant reply so the user can see what the agent sent.
+        # For cron/heartbeat triggers the trigger itself is not stored (no USER entry),
+        # but the outbound response IS stored as ASSISTANT so the history stays meaningful.
         if tool_summaries:
             tool_log = "\n".join(tool_summaries)
             session.add_message("assistant", final_content, tool_summary=tool_log)
