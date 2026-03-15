@@ -46,6 +46,7 @@ _SAVE_MEMORY_TOOL = [
     }
 ]
 
+
 class MemoryStore:
     """Two-layer memory: MEMORY.md (long-term facts) + HISTORY.md (grep-searchable log)."""
 
@@ -113,21 +114,23 @@ class MemoryStore:
             lines.append(f"[{timestamp}] {role}: {content}")
 
         current_memory = self.read_long_term()
-        history_text = chr(10).join(lines)
-        prompt = f"""[Memory Consolidation Prompt]
-You are a memory consolidation assistant. Read the conversation history below and call the `save_memory` tool.
+        history_block = chr(10).join(lines) or "(empty)"
+        prompt_instructions = """[Memory Consolidation Prompt]
+You are a memory consolidation agent. Read the current long-term memory and the conversation history, then call the save_memory tool.
+Do not answer the conversation. Do not continue the chat. Do not output explanatory text.
+You must call save_memory even if there is no new memory to add.
+- history_entry: Write a concise but searchable summary of the important events, decisions, requests, and outcomes in this batch.
+- memory_update: Return the full updated long-term memory in markdown. If nothing changes, return the current long-term memory unchanged.
+Return tool arguments only via save_memory."""
+        prompt = f"""{prompt_instructions}
 
-Requirements:
-1. `history_entry` must be a 2-5 sentence summary of the key events, decisions, and topics, and must start with `[YYYY-MM-DD HH:MM]` for grep-friendly search.
-2. `memory_update` must be the full updated long-term memory in markdown. Preserve existing facts and add new durable facts. If there is no new long-term memory, return the current long-term memory unchanged.
-3. Do not answer the conversation. Do not continue the chat. Only call `save_memory`.
-
-Current long-term memory:
+[Current Long-term Memory]
 {current_memory or "(empty)"}
+
 [Conversation History]
-{history_text}
-[Memory Consolidation Prompt]
-Based on the conversation history above, call the `save_memory` tool and provide both `history_entry` and `memory_update`."""
+{history_block}
+
+{prompt_instructions}"""
 
         try:
             # 使用 Provider 的 response 方法
@@ -172,7 +175,7 @@ Based on the conversation history above, call the `save_memory` tool and provide
                 self.append_history(entry)
             else:
                 print("[Memory] No history_entry in args")
-
+                
             if update := args.get("memory_update"):
                 if not isinstance(update, str):
                     update = json.dumps(update, ensure_ascii=False)
