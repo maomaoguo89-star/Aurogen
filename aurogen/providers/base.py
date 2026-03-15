@@ -24,7 +24,6 @@ class BaseProviderAdapter(ABC):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         pass

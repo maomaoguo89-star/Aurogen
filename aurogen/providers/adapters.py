@@ -23,37 +23,6 @@ def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict] | None:
     ]
 
 
-def _normalize_tool_calls_from_content_blocks(raw_content: Any) -> list[dict] | None:
-    """从 content block（如 Anthropic tool_use）提取 tool calls。"""
-    if not isinstance(raw_content, list):
-        return None
-
-    normalized: list[dict] = []
-    for block in raw_content:
-        btype = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
-        if btype != "tool_use":
-            continue
-
-        tool_id = block.get("id") if isinstance(block, dict) else getattr(block, "id", None)
-        name = block.get("name") if isinstance(block, dict) else getattr(block, "name", None)
-        input_args = block.get("input") if isinstance(block, dict) else getattr(block, "input", None)
-
-        if not name:
-            continue
-        normalized.append(
-            {
-                "id": tool_id or f"tool_call_{len(normalized) + 1}",
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "arguments": input_args if input_args is not None else {},
-                },
-            }
-        )
-
-    return normalized or None
-
-
 def _parse_openai_message(message: Any) -> tuple[str, str | None, Any]:
     """从 OpenAI 兼容 message 对象中提取 (content, thinking, reasoning_details)。
 
@@ -95,15 +64,8 @@ def _should_retry_without_reasoning_effort(exc: Exception) -> bool:
     """Return True when the upstream rejects reasoning_effort/reasoningEffort."""
     text = str(exc).lower()
     return (
-        (
-            ("reasoning_effort" in text or "reasoningeffort" in text)
-            and ("does not support" in text or "unsupported" in text or "invalid" in text)
-        )
-        or (
-            "thinking" in text
-            and ("tool_choice" in text or "forces tool use" in text)
-            and ("may not be enabled" in text or "not allowed" in text or "invalid" in text)
-        )
+        ("reasoning_effort" in text or "reasoningeffort" in text)
+        and ("does not support" in text or "unsupported" in text or "invalid" in text)
     )
 
 
@@ -136,15 +98,12 @@ class OpenAICustomAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key, base_url=self.api_base)
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
         if thinking != "none":
             kwargs["reasoning_effort"] = thinking
 
@@ -152,10 +111,7 @@ class OpenAICustomAdapter(BaseProviderAdapter):
         message = raw.choices[0].message
 
         content, thinking, reasoning_details = _parse_openai_message(message)
-        raw_content = getattr(message, "content", None)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        if not tool_calls:
-            tool_calls = _normalize_tool_calls_from_content_blocks(raw_content)
 
         return AdapterResponse(
             content=content,
@@ -176,15 +132,12 @@ class OpenAIOfficialAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key)
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
         if thinking != "none":
             kwargs["reasoning_effort"] = thinking
 
@@ -205,8 +158,6 @@ class OpenAIOfficialAdapter(BaseProviderAdapter):
             content = raw_content if isinstance(raw_content, str) else str(raw_content or "")
 
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        if not tool_calls:
-            tool_calls = _normalize_tool_calls_from_content_blocks(raw_content)
         return AdapterResponse(
             content=content,
             thinking=None,
@@ -226,7 +177,6 @@ class AnthropicAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         raise NotImplementedError("AnthropicAdapter.response() 待实现")
@@ -245,7 +195,6 @@ class AzureAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         from openai import AzureOpenAI
@@ -257,15 +206,10 @@ class AzureAdapter(BaseProviderAdapter):
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
-        raw_content = getattr(message, "content", None)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        if not tool_calls:
-            tool_calls = _normalize_tool_calls_from_content_blocks(raw_content)
         return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
 
 
@@ -280,22 +224,16 @@ class OllamaAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key="ollama", base_url=self.api_base)
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
-        raw_content = getattr(message, "content", None)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        if not tool_calls:
-            tool_calls = _normalize_tool_calls_from_content_blocks(raw_content)
         return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
 
 
@@ -310,22 +248,16 @@ class OpenRouterAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key, base_url="https://openrouter.ai/api/v1")
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
-        raw_content = getattr(message, "content", None)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        if not tool_calls:
-            tool_calls = _normalize_tool_calls_from_content_blocks(raw_content)
         return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
 
 
@@ -340,20 +272,14 @@ class XAIAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key, base_url="https://api.x.ai/v1")
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
-        if tool_choice is not None:
-            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
-        raw_content = getattr(message, "content", None)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        if not tool_calls:
-            tool_calls = _normalize_tool_calls_from_content_blocks(raw_content)
         return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
