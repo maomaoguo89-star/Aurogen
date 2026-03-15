@@ -98,12 +98,15 @@ class OpenAICustomAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key, base_url=self.api_base)
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         if thinking != "none":
             kwargs["reasoning_effort"] = thinking
 
@@ -132,12 +135,15 @@ class OpenAIOfficialAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key)
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         if thinking != "none":
             kwargs["reasoning_effort"] = thinking
 
@@ -177,6 +183,7 @@ class AnthropicAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         raise NotImplementedError("AnthropicAdapter.response() 待实现")
@@ -195,6 +202,7 @@ class AzureAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         from openai import AzureOpenAI
@@ -206,6 +214,8 @@ class AzureAdapter(BaseProviderAdapter):
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
@@ -224,12 +234,15 @@ class OllamaAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key="ollama", base_url=self.api_base)
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
@@ -248,12 +261,15 @@ class OpenRouterAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key, base_url="https://openrouter.ai/api/v1")
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
@@ -272,12 +288,15 @@ class XAIAdapter(BaseProviderAdapter):
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         thinking: str = "none",
     ) -> AdapterResponse:
         client = OpenAI(api_key=self.api_key, base_url="https://api.x.ai/v1")
         kwargs: dict = {"model": model, "messages": messages}
         if tools:
             kwargs["tools"] = tools
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
         raw = client.chat.completions.create(**kwargs)
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)

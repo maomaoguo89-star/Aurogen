@@ -71,6 +71,7 @@ class Provider:
         provider_key: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
     ) -> Any:
         provider_cfg = config_manager.get(f"providers.{provider_key}", {})
         model = provider_cfg.get("model", "gpt-4o")
@@ -84,21 +85,39 @@ class Provider:
 
         settings = provider_cfg.get("settings", {})
         adapter = info.cls(**settings)
-        return adapter.response(model, messages, tools, thinking=thinking)
+        return adapter.response(
+            model,
+            messages,
+            tools,
+            tool_choice=tool_choice,
+            thinking=thinking,
+        )
 
     def response(
         self,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
         agent_name: str = "main",
     ) -> Any:
         provider_key = config_manager.get(f"agents.{agent_name}.provider", "openai")
-        return self._response_with_provider_key(provider_key, messages, tools)
+        return self._response_with_provider_key(
+            provider_key,
+            messages,
+            tools,
+            tool_choice=tool_choice,
+        )
 
     def response_for_provider(
         self,
         provider_key: str,
         messages: list[dict],
         tools: list[dict] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
     ) -> Any:
-        return self._response_with_provider_key(provider_key, messages, tools)
+        return self._response_with_provider_key(
+            provider_key,
+            messages,
+            tools,
+            tool_choice=tool_choice,
+        )

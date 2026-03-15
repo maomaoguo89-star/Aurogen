@@ -46,6 +46,11 @@ _SAVE_MEMORY_TOOL = [
     }
 ]
 
+_SAVE_MEMORY_TOOL_CHOICE = {
+    "type": "function",
+    "function": {"name": "save_memory"},
+}
+
 
 class MemoryStore:
     """Two-layer memory: MEMORY.md (long-term facts) + HISTORY.md (grep-searchable log)."""
@@ -97,7 +102,7 @@ class MemoryStore:
             keep_count = memory_window // 2
             if len(session.messages) <= keep_count:
                 return True
-            if len(session.messages) - session.last_consolidated <= memory_window:
+            if len(session.messages) - session.last_consolidated < memory_window:
                 return True
             old_messages = session.messages[session.last_consolidated:-keep_count]
             if not old_messages:
@@ -113,8 +118,21 @@ class MemoryStore:
             content = m["content"]
             lines.append(f"[{timestamp}] {role}: {content}")
 
+        if not lines:
+            session.last_consolidated = 0 if archive_all else len(session.messages) - keep_count
+            session._save_session()
+            print("[Memory] No non-empty messages to consolidate")
+            return True
+
         current_memory = self.read_long_term()
-        prompt = f"""Process this conversation and call the save_memory tool with your consolidation.
+        prompt = f"""Consolidate the conversation into persistent memory.
+
+Rules:
+- Always call the save_memory tool exactly once.
+- Do not answer or continue the conversation.
+- history_entry must be a concise 2-5 sentence summary starting with [YYYY-MM-DD HH:MM].
+- memory_update must be the full updated long-term memory in markdown.
+- If there are no new long-term facts, return the current long-term memory unchanged.
 
 ## Current Long-term Memory
 {current_memory or "(empty)"}
@@ -127,10 +145,17 @@ class MemoryStore:
             response = await asyncio.to_thread(
                 provider.response,
                 messages=[
-                    {"role": "system", "content": "You are a memory consolidation agent. Call the save_memory tool with your consolidation of the conversation."},
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a memory consolidation agent. "
+                            "You must call the save_memory tool exactly once and must not reply with plain text."
+                        ),
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 tools=_SAVE_MEMORY_TOOL,
+                tool_choice=_SAVE_MEMORY_TOOL_CHOICE,
                 agent_name=self.agent_name,
             )
 
@@ -145,7 +170,12 @@ class MemoryStore:
 
             print(f"[Memory] Tool calls: {[tc['function']['name'] for tc in tool_calls]}")
 
-            args = tool_calls[0]["function"]["arguments"]
+            tool_call = tool_calls[0]
+            if tool_call["function"]["name"] != "save_memory":
+                print(f"[Memory] Unexpected tool call: {tool_call['function']['name']}")
+                return False
+
+            args = tool_call["function"]["arguments"]
             print(f"[Memory] Raw arguments type: {type(args).__name__}")
             
             # arguments 可能是字符串或已经解析的 dict
@@ -157,25 +187,32 @@ class MemoryStore:
 
             print(f"[Memory] Parsed args keys: {list(args.keys())}")
 
-            entry = args.get("history_entry")
-            if entry:
-                if not isinstance(entry, str):
-                    entry = json.dumps(entry, ensure_ascii=False)
-                print(f"[Memory] Writing history entry: {entry[:100]}...")
-                self.append_history(entry)
+            if "history_entry" not in args:
+                print("[Memory] Missing history_entry in args")
+                return False
+            if "memory_update" not in args:
+                print("[Memory] Missing memory_update in args")
+                return False
+
+            entry = args["history_entry"]
+            if not isinstance(entry, str):
+                entry = json.dumps(entry, ensure_ascii=False)
+            if not entry.strip():
+                print("[Memory] Empty history_entry in args")
+                return False
+
+            update = args["memory_update"]
+            if not isinstance(update, str):
+                update = json.dumps(update, ensure_ascii=False)
+
+            print(f"[Memory] Writing history entry: {entry[:100]}...")
+            self.append_history(entry)
+
+            if update != current_memory:
+                print(f"[Memory] Writing memory update: {update[:100]}...")
+                self.write_long_term(update)
             else:
-                print("[Memory] No history_entry in args")
-                
-            if update := args.get("memory_update"):
-                if not isinstance(update, str):
-                    update = json.dumps(update, ensure_ascii=False)
-                if update != current_memory:
-                    print(f"[Memory] Writing memory update: {update[:100]}...")
-                    self.write_long_term(update)
-                else:
-                    print("[Memory] Memory unchanged, skipping write")
-            else:
-                print("[Memory] No memory_update in args")
+                print("[Memory] Memory unchanged, skipping write")
 
             session.last_consolidated = 0 if archive_all else len(session.messages) - keep_count
             session._save_session()
