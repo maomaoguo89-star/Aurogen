@@ -64,8 +64,15 @@ def _should_retry_without_reasoning_effort(exc: Exception) -> bool:
     """Return True when the upstream rejects reasoning_effort/reasoningEffort."""
     text = str(exc).lower()
     return (
-        ("reasoning_effort" in text or "reasoningeffort" in text)
-        and ("does not support" in text or "unsupported" in text or "invalid" in text)
+        (
+            ("reasoning_effort" in text or "reasoningeffort" in text)
+            and ("does not support" in text or "unsupported" in text or "invalid" in text)
+        )
+        or (
+            "thinking" in text
+            and ("tool_choice" in text or "forces tool use" in text)
+            and ("may not be enabled" in text or "not allowed" in text or "invalid" in text)
+        )
     )
 
 
