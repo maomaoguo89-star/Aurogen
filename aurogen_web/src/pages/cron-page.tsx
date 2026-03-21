@@ -445,7 +445,7 @@ function AddJobModal({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
         transition={{ duration: 0.15 }}
-        className="panel-surface w-full max-w-lg p-6 shadow-[var(--shadow-lg)]"
+        className="panel-surface w-full max-w-lg p-4 shadow-[var(--shadow-lg)]"
       >
         <div className="mb-5 flex items-center justify-between">
           <div>
@@ -648,7 +648,7 @@ function JobDetailPanel({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* 顶部操作栏 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] px-4 py-3">
         <div>
           <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)]">{job.name}</h2>
           <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-tertiary)]">{job.id}</p>
@@ -708,7 +708,7 @@ function JobDetailPanel({
       )}
 
       {/* 内容区 */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4">
         {editing ? (
           <div className="space-y-5">
             <JobForm form={form} onChange={handleChange} />
@@ -828,7 +828,7 @@ function JobDetailPanel({
 function EmptyDetail() {
   const { t } = useTranslation()
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-subtle)] p-8">
+    <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-subtle)] p-5">
       <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]">
         <CalendarClock className="h-5 w-5 text-[var(--color-text-tertiary)]" />
       </div>
@@ -965,7 +965,7 @@ export function CronPage() {
     <section className="flex h-full min-h-0 flex-col">
       {/* 全局错误横幅 */}
       {error && (
-        <div className="mb-2 flex items-start gap-3 rounded-[var(--radius-md)] border border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-3 text-sm text-[var(--color-danger)]">
+        <div className="mb-2 flex items-start gap-3 rounded-[var(--radius-md)] border border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-medium">{t('common.operationError')}</p>
@@ -977,7 +977,7 @@ export function CronPage() {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-2 overflow-hidden grid-cols-[360px_minmax(0,1fr)]">
         {/* ── 左栏 ── */}
         <div className="panel-surface flex min-h-0 flex-col overflow-hidden p-4">
           {/* 服务状态摘要 */}
@@ -1063,7 +1063,7 @@ export function CronPage() {
               onRun={handleRun}
             />
           ) : (
-            <div className="flex h-full items-center justify-center p-6">
+            <div className="flex h-full items-center justify-center p-5">
               <EmptyDetail />
             </div>
           )}

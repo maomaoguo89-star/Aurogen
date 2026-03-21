@@ -316,7 +316,7 @@ export function AgentsPage() {
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
       {error ? (
-        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-3 text-sm text-[var(--color-danger)]">
+        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-medium">{t('common.operationError')}</p>
@@ -328,7 +328,7 @@ export function AgentsPage() {
         </div>
       ) : null}
 
-      <div className="panel-surface flex items-center gap-3 px-5 py-3">
+      <div className="panel-surface flex items-center gap-3 px-4 py-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
           <input
@@ -356,7 +356,7 @@ export function AgentsPage() {
           {loading ? (
             <CardGridSkeleton />
           ) : filteredAgents.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               <AnimatePresence mode="popLayout">
                 {filteredAgents.map((agent, index) => {
                   const selected = selectedKey === agent.key
@@ -416,7 +416,7 @@ export function AgentsPage() {
             </div>
           ) : (
             <div className="flex h-full min-h-[200px] items-center justify-center">
-              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-6 py-8 text-center text-sm subtle-text">
+              <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-5 py-6 text-center text-sm subtle-text">
                 {agents.length === 0
                   ? t('claws.emptyNoConfig')
                   : t('claws.emptyNoMatch')}
@@ -549,7 +549,7 @@ function ClawDrawer({
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           className="absolute inset-y-0 right-0 z-20 flex w-full max-w-[640px] flex-col rounded-l-[var(--radius-lg)] border-l border-[var(--color-border-subtle)] bg-[var(--color-bg-panel)] shadow-[var(--shadow-lg)]"
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border-subtle)] px-5 py-3">
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border-subtle)] px-4 py-3">
             <div className="flex items-center gap-3">
               <span className="text-xl" role="img">{getDisplayEmoji(agent)}</span>
               <div>
@@ -573,7 +573,7 @@ function ClawDrawer({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {editMode ? (
               <ClawEditor
                 agent={agent}
@@ -1037,7 +1037,7 @@ function AddClawModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            className="panel-surface w-full max-w-lg p-6 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-lg p-4 shadow-[var(--shadow-lg)]"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -1155,7 +1155,7 @@ function ConfirmResetModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            className="panel-surface w-full max-w-md p-5 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-md p-4 shadow-[var(--shadow-lg)]"
             role="alertdialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -1247,7 +1247,7 @@ function ConfirmDeleteModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            className="panel-surface w-full max-w-md p-5 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-md p-4 shadow-[var(--shadow-lg)]"
             role="alertdialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -1454,7 +1454,7 @@ function FormField({
 
 function CardGridSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}

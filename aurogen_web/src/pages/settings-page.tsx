@@ -281,7 +281,7 @@ export function SettingsPage() {
   return (
     <section className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
       {error ? (
-        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-3 text-sm text-[var(--color-danger)]">
+        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-medium">{t('common.operationError')}</p>
@@ -298,7 +298,7 @@ export function SettingsPage() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className="panel-surface border-[color:var(--color-success)]/30 bg-[color:var(--color-success)]/10 px-5 py-3 text-[13px] font-medium text-[var(--color-success)]"
+          className="panel-surface border-[color:var(--color-success)]/30 bg-[color:var(--color-success)]/10 px-4 py-3 text-[13px] font-medium text-[var(--color-success)]"
         >
           {successMessage}
         </motion.div>
@@ -395,7 +395,7 @@ function RuntimeLimitsCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: 0 }}
       onSubmit={(e) => { void handleSubmit(e) }}
-      className="panel-surface flex flex-col gap-5 p-5"
+      className="panel-surface flex flex-col gap-4 p-4"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
@@ -467,7 +467,7 @@ function LeaderProviderCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: 0 }}
       onSubmit={(e) => { void handleSubmit(e) }}
-      className="panel-surface flex flex-col gap-5 p-5"
+      className="panel-surface flex flex-col gap-4 p-4"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
@@ -515,7 +515,7 @@ function AppearanceCard() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: 0 }}
-      className="panel-surface flex flex-col gap-5 p-5"
+      className="panel-surface flex flex-col gap-4 p-4"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
@@ -614,7 +614,7 @@ function HeartbeatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: 0 }}
       onSubmit={(e) => { void handleSubmit(e) }}
-      className="panel-surface flex flex-col gap-5 p-5"
+      className="panel-surface flex flex-col gap-4 p-4"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
@@ -685,7 +685,7 @@ function PasswordCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: 0.12 }}
       onSubmit={(e) => { void handleSubmit(e) }}
-      className="panel-surface flex flex-col gap-5 p-5"
+      className="panel-surface flex flex-col gap-4 p-4"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">

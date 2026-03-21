@@ -291,7 +291,7 @@ function ConfirmDeleteModal({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="panel-surface w-full max-w-md p-6 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-md p-4 shadow-[var(--shadow-lg)]"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -498,7 +498,7 @@ export function SessionsPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
-      <div className="panel-surface flex items-center gap-3 px-5 py-3">
+      <div className="panel-surface flex items-center gap-3 px-4 py-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
           <input
@@ -536,9 +536,9 @@ export function SessionsPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-2 grid-cols-[360px_minmax(0,1fr)]">
         {/* Left: grouped list */}
-        <section className="panel-surface flex min-h-0 flex-col p-5">
+        <section className="panel-surface flex min-h-0 flex-col p-4">
           <div className="min-h-0 flex-1 overflow-y-auto">
             {loading && (
               <div className="flex h-full items-center justify-center gap-2 text-[13px] subtle-text">
@@ -589,7 +589,7 @@ export function SessionsPage() {
         </section>
 
         {/* Right: detail */}
-        <section className="panel-surface min-h-[340px] flex-1 overflow-y-auto p-6">
+        <section className="panel-surface min-h-[340px] flex-1 overflow-y-auto p-4">
           {!selected ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">

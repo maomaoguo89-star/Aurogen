@@ -1,4 +1,5 @@
-import { Activity, Blocks, Brain, BrainCircuit, CalendarClock, Cat, History, MessageSquareText, Package, Radio, Settings, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Activity, Blocks, Brain, BrainCircuit, CalendarClock, Cat, History, MessageSquareText, Package, Radio, Settings, PanelLeftClose } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -21,88 +22,133 @@ const futureItems: string[] = []
 
 export function AppShell() {
   const { t } = useTranslation()
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-transparent px-4 py-4 text-[var(--color-text-primary)]">
-      <div className="grid h-[calc(100dvh-2rem)] min-h-0 gap-4 overflow-hidden xl:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="glass-surface flex min-h-0 overflow-hidden flex-col px-3 py-4">
-          <div className="border-b border-[var(--color-border-subtle)] px-2 pb-3 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)]">
-                <Sparkles className="h-4.5 w-4.5 text-[var(--color-accent)]" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">Aurogen</p>
-                <p className="text-[10px] tracking-[0.06em] tertiary-text">
+    <div className="h-[100dvh] overflow-hidden bg-transparent px-3 py-3 text-[var(--color-text-primary)]">
+      <div
+        className={cn(
+          'grid h-[calc(100dvh-1.5rem)] min-h-0 gap-3 overflow-hidden transition-[grid-template-columns] duration-300 ease-[var(--ease-emphasis)]',
+          collapsed
+            ? 'grid-cols-[56px_minmax(0,1fr)]'
+            : 'grid-cols-[220px_minmax(0,1fr)]',
+        )}
+      >
+        <aside className="glass-surface flex min-h-0 overflow-hidden flex-col px-2.5 py-3">
+          {/* Logo row with collapse toggle */}
+          <div className="border-b border-[var(--color-border-subtle)] pb-2 mb-2 shrink-0">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <button
+                onClick={() => setCollapsed(!collapsed)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] transition hover:bg-[var(--color-bg-hover)] cursor-pointer"
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                <span className="text-base leading-none">🍊</span>
+              </button>
+              <div className={cn(
+                'min-w-0 flex-1 overflow-hidden transition-opacity duration-300',
+                collapsed ? 'opacity-0' : 'opacity-100',
+              )}>
+                <p className="text-sm font-semibold text-[var(--color-text-primary)] whitespace-nowrap">Aurogen</p>
+                <p className="text-[10px] tracking-[0.06em] tertiary-text whitespace-nowrap">
                   Agent Ops Console
                 </p>
               </div>
+              <button
+                onClick={() => setCollapsed(!collapsed)}
+                className={cn(
+                  'shrink-0 flex items-center justify-center rounded-[var(--radius-sm)] transition tertiary-text hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] cursor-pointer h-7 w-7',
+                  collapsed ? 'opacity-0 pointer-events-none w-0 overflow-hidden' : 'opacity-100',
+                )}
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="mt-4 px-2">
-            <p className="compact-eyebrow-text mb-2.5 text-[10px] uppercase tertiary-text">
-              Main
-            </p>
-            <nav className="space-y-1.5">
-              {navItemDefs.map((item) => {
-                const Icon = item.icon
-
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      cn(
-                        'group flex items-start gap-3 rounded-[var(--radius-md)] border px-3 py-2.5 transition duration-[var(--duration-fast)]',
-                        isActive
-                          ? 'border-[var(--color-border-strong)] bg-[var(--color-accent-soft)]'
-                          : 'border-transparent hover:border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)]',
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <div
-                          className={cn(
-                            'mt-0.5 flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border transition',
-                            isActive
-                              ? 'border-[var(--color-border-subtle)] bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
-                              : 'border-[var(--color-border-subtle)]/50 bg-[var(--color-bg-hover)]/50 text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]',
-                          )}
-                        >
-                          <Icon className="h-3.5 w-3.5 transition-transform duration-150 group-hover:scale-110" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-[var(--color-text-primary)]">{item.label}</p>
-                          <p className="mt-0.5 text-[11px] subtle-text">{t(item.descKey)}</p>
-                        </div>
-                      </>
-                    )}
-                  </NavLink>
-                )
-              })}
-            </nav>
-          </div>
-
-          {futureItems.length > 0 ? (
-            <div className="mt-5 px-2">
-              <p className="compact-eyebrow-text mb-2.5 text-[10px] uppercase tertiary-text">
-                Later
+          {/* Nav */}
+          <div className="flex-1 min-h-0 overflow-y-auto scroll-area">
+            <div>
+              <p className={cn(
+                'compact-eyebrow-text text-[10px] uppercase tertiary-text overflow-hidden whitespace-nowrap transition-all duration-300',
+                collapsed ? 'h-0 mb-0 opacity-0' : 'h-4 mb-1.5 opacity-100',
+              )}>
+                Main
               </p>
-              <div className="space-y-1.5">
-                {futureItems.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-subtle)] px-4 py-2.5 text-[13px] subtle-text"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
+              <nav className={cn('space-y-1', collapsed && 'flex flex-col items-center')}>
+                {navItemDefs.map((item) => {
+                  const Icon = item.icon
+
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      title={collapsed ? item.label : undefined}
+                      className={({ isActive }) =>
+                        cn(
+                          'group flex items-center overflow-hidden rounded-[var(--radius-sm)] border transition-all duration-200',
+                          collapsed
+                            ? cn(
+                                'h-9 w-9 justify-center p-0',
+                                isActive
+                                  ? 'border-[var(--color-border-strong)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
+                                  : 'border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]',
+                              )
+                            : cn(
+                                'gap-2.5 px-2.5 py-2',
+                                isActive
+                                  ? 'border-[var(--color-border-strong)] bg-[var(--color-accent-soft)]'
+                                  : 'border-transparent hover:border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-hover)]',
+                              ),
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <div
+                            className={cn(
+                              'flex shrink-0 items-center justify-center rounded-[var(--radius-xs)] border transition',
+                              collapsed ? 'h-auto w-auto border-transparent' : 'h-7 w-7',
+                              !collapsed && (isActive
+                                ? 'border-[var(--color-border-subtle)] bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
+                                : 'border-[var(--color-border-subtle)]/50 bg-[var(--color-bg-hover)]/50 text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]'),
+                            )}
+                          >
+                            <Icon className={cn('transition-transform duration-150 group-hover:scale-110', collapsed ? 'h-4 w-4' : 'h-3.5 w-3.5')} />
+                          </div>
+                          <div className={cn(
+                            'min-w-0 overflow-hidden whitespace-nowrap transition-opacity duration-300',
+                            collapsed ? 'w-0 opacity-0' : 'opacity-100',
+                          )}>
+                            <p className="text-[13px] font-medium text-[var(--color-text-primary)]">{item.label}</p>
+                            <p className="text-[11px] subtle-text">{t(item.descKey)}</p>
+                          </div>
+                        </>
+                      )}
+                    </NavLink>
+                  )
+                })}
+              </nav>
             </div>
-          ) : null}
+
+            {futureItems.length > 0 ? (
+              <div className={cn('mt-3', collapsed && 'hidden')}>
+                <p className="compact-eyebrow-text mb-1.5 text-[10px] uppercase tertiary-text">
+                  Later
+                </p>
+                <div className="space-y-0.5">
+                  {futureItems.map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-[var(--radius-sm)] border border-dashed border-[var(--color-border-subtle)] px-2 py-1.5 text-[13px] subtle-text"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </aside>
 

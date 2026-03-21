@@ -23,6 +23,37 @@ def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict] | None:
     ]
 
 
+def _normalize_usage(raw_usage: Any) -> dict[str, Any] | None:
+    """Normalize SDK usage objects into plain dict form."""
+    if not raw_usage:
+        return None
+
+    if isinstance(raw_usage, dict):
+        usage = dict(raw_usage)
+    elif hasattr(raw_usage, "model_dump"):
+        usage = raw_usage.model_dump()
+    else:
+        usage = {}
+        for key in (
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+            "prompt_tokens_details",
+            "completion_tokens_details",
+        ):
+            if hasattr(raw_usage, key):
+                usage[key] = getattr(raw_usage, key)
+        if not usage:
+            return None
+
+    for key in ("prompt_tokens_details", "completion_tokens_details"):
+        value = usage.get(key)
+        if hasattr(value, "model_dump"):
+            usage[key] = value.model_dump()
+
+    return usage
+
+
 def _parse_openai_message(message: Any) -> tuple[str, str | None, Any]:
     """从 OpenAI 兼容 message 对象中提取 (content, thinking, reasoning_details)。
 
@@ -112,12 +143,14 @@ class OpenAICustomAdapter(BaseProviderAdapter):
 
         content, thinking, reasoning_details = _parse_openai_message(message)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
+        usage = _normalize_usage(getattr(raw, "usage", None))
 
         return AdapterResponse(
             content=content,
             thinking=thinking,
             tool_calls=tool_calls,
             reasoning_details=reasoning_details,
+            usage=usage,
         )
 
 
@@ -158,11 +191,13 @@ class OpenAIOfficialAdapter(BaseProviderAdapter):
             content = raw_content if isinstance(raw_content, str) else str(raw_content or "")
 
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
+        usage = _normalize_usage(getattr(raw, "usage", None))
         return AdapterResponse(
             content=content,
             thinking=None,
             tool_calls=tool_calls,
             reasoning_details=None,
+            usage=usage,
         )
 
 
@@ -210,7 +245,8 @@ class AzureAdapter(BaseProviderAdapter):
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
+        usage = _normalize_usage(getattr(raw, "usage", None))
+        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details, usage=usage)
 
 
 class OllamaAdapter(BaseProviderAdapter):
@@ -234,7 +270,8 @@ class OllamaAdapter(BaseProviderAdapter):
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
+        usage = _normalize_usage(getattr(raw, "usage", None))
+        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details, usage=usage)
 
 
 class OpenRouterAdapter(BaseProviderAdapter):
@@ -258,7 +295,8 @@ class OpenRouterAdapter(BaseProviderAdapter):
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
+        usage = _normalize_usage(getattr(raw, "usage", None))
+        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details, usage=usage)
 
 
 class XAIAdapter(BaseProviderAdapter):
@@ -282,4 +320,5 @@ class XAIAdapter(BaseProviderAdapter):
         message = raw.choices[0].message
         content, thinking, reasoning_details = _parse_openai_message(message)
         tool_calls = _normalize_tool_calls(getattr(message, "tool_calls", None))
-        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details)
+        usage = _normalize_usage(getattr(raw, "usage", None))
+        return AdapterResponse(content=content, thinking=thinking, tool_calls=tool_calls, reasoning_details=reasoning_details, usage=usage)

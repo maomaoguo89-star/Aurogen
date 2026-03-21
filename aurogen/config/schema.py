@@ -56,6 +56,7 @@ class LeaderAgentConfig(BaseModel):
 class RuntimeLimitsConfig(BaseModel):
     agent_loop_max_iterations: int = 40
     group_max_turns: int = 12
+    include_current_time_in_context: bool = False
 
 
 class AppConfig(BaseModel):

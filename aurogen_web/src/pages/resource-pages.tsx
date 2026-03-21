@@ -19,7 +19,7 @@ export function StatusPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
-      <header className="panel-surface flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+      {/* <header className="panel-surface flex flex-wrap items-center justify-between gap-4 px-4 py-3">
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
             <Activity className="h-4.5 w-4.5 text-[var(--color-accent)]" />
@@ -34,7 +34,7 @@ export function StatusPage() {
             </p>
           </div>
         </div>
-      </header>
+      </header> */}
 
       {error ? (
         <div className="panel-surface border-[color:var(--color-danger)]/20 bg-[color:var(--color-danger)]/10 px-4 py-3 text-[13px] text-[var(--color-danger)]">
@@ -42,8 +42,8 @@ export function StatusPage() {
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <section className="panel-surface min-h-0 p-5">
+      <div className="grid min-h-0 flex-1 gap-2 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <section className="panel-surface min-h-0 p-4">
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{t('status.runtimeHealth')}</h2>
             <span className="rounded-full border border-[var(--color-border-subtle)] px-3 py-1 text-[11px] subtle-text">
@@ -117,7 +117,7 @@ export function StatusPage() {
           </div>
         </section>
 
-        <section className="panel-surface min-h-0 p-5">
+        <section className="panel-surface min-h-0 p-4">
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{t('status.resourceSummary')}</h2>
             <span className="rounded-full border border-[var(--color-border-subtle)] px-3 py-1 text-[11px] subtle-text">
@@ -141,7 +141,7 @@ export function NotFoundPage() {
   const { t } = useTranslation()
 
   return (
-    <section className="panel-surface flex h-full min-h-0 flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+    <section className="panel-surface flex h-full min-h-0 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
         <Sparkles className="h-6 w-6 text-[var(--color-accent)]" />
       </div>

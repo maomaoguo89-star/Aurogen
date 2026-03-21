@@ -368,7 +368,7 @@ export function AgentGroupsPage() {
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
       {error ? (
-        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-4 text-sm text-[var(--color-danger)]">
+        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">{t('groups.currentIssue')}</p>
@@ -377,7 +377,7 @@ export function AgentGroupsPage() {
         </div>
       ) : null}
 
-      <header className="panel-surface flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+      {/* <header className="panel-surface flex flex-wrap items-center justify-between gap-4 px-4 py-3">
         <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/60">
             <BrainCircuit className="h-4.5 w-4.5 text-[var(--color-accent)]" />
@@ -400,10 +400,10 @@ export function AgentGroupsPage() {
           {refreshing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           {t('groups.refresh')}
         </button>
-      </header>
+      </header> */}
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[280px_minmax(0,1.2fr)_360px]">
-        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col p-4">
+      <div className="grid min-h-0 flex-1 gap-2 overflow-hidden grid-cols-[280px_minmax(0,1.2fr)_360px]">
+        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col py-4 px-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('groups.runs')}</h2>
@@ -414,7 +414,7 @@ export function AgentGroupsPage() {
             </div>
           </div>
 
-          <div className="scroll-area min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          <div className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {loading ? (
               <div className="rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/40 px-4 py-6 text-sm subtle-text">
                 {t('common.loading')}
@@ -462,7 +462,7 @@ export function AgentGroupsPage() {
         </aside>
 
         <section className="panel-surface flex min-h-0 overflow-hidden flex-col">
-          <div className="shrink-0 border-b border-[var(--color-border-subtle)] px-5 py-4">
+          <div className="shrink-0 border-b border-[var(--color-border-subtle)] px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('groups.transcript')}</h2>
@@ -476,10 +476,10 @@ export function AgentGroupsPage() {
             </div>
           </div>
 
-          <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          <div className="scroll-area min-h-0 flex-1 overflow-y-auto px-4 py-4">
             {selectedRun ? (
               events.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {events.map((event) => (
                     <TranscriptCard key={`${event.seq}-${event.type}`} event={event} />
                   ))}
@@ -505,8 +505,8 @@ export function AgentGroupsPage() {
           </div>
 
           {selectedRun ? (
-            <div className="shrink-0 border-t border-[var(--color-border-subtle)] px-5 py-4">
-              <div className="space-y-3">
+            <div className="shrink-0 border-t border-[var(--color-border-subtle)] px-4 py-3">
+              <div className="space-y-2">
                 <div className="flex items-center gap-2 text-[12px] subtle-text">
                   <MessageSquarePlus className="h-4 w-4 text-[var(--color-accent)]" />
                   {t('groups.followupHint')}
@@ -538,13 +538,13 @@ export function AgentGroupsPage() {
           ) : null}
         </section>
 
-        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col p-5">
+        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col py-4 px-3">
           <div className="mb-4">
             <h2 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('groups.createRun')}</h2>
             <p className="mt-1 text-[11px] tertiary-text">{t('groups.createHint')}</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div>
               <p className="mb-2 text-[11px] tracking-[0.06em] tertiary-text">{t('groups.title')}</p>
               <input
@@ -637,7 +637,7 @@ export function AgentGroupsPage() {
           </div>
 
           {selectedRun ? (
-            <div className="space-y-3 overflow-y-auto">
+            <div className="space-y-2 overflow-y-auto">
               <DetailField label={t('groups.status')}>{selectedRun.status}</DetailField>
               <DetailField label={t('groups.leaderProvider')}>{selectedRun.leader_provider}</DetailField>
               <DetailField label={t('groups.members')}>
@@ -776,7 +776,7 @@ function MemberPickerModal({
       onClick={onClose}
     >
       <div
-        className="panel-surface w-full max-w-3xl p-5 shadow-[var(--shadow-lg)]"
+        className="panel-surface w-full max-w-3xl p-4 shadow-[var(--shadow-lg)]"
         role="dialog"
         aria-modal="true"
         onClick={(event) => {

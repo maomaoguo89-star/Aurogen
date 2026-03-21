@@ -249,7 +249,7 @@ export function McpPage() {
   return (
     <section className="flex h-full min-h-0 flex-col gap-4">
       {error ? (
-        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-3 text-sm text-[var(--color-danger)]">
+        <div className="panel-surface flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-medium">{t('common.operationError')}</p>
@@ -267,7 +267,7 @@ export function McpPage() {
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-2 grid-cols-[360px_minmax(0,1fr)]">
         {/* Left: Server List */}
         <section className="panel-surface flex min-h-0 flex-col p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -388,7 +388,7 @@ export function McpPage() {
         </section>
 
         {/* Right: Detail / Editor */}
-        <section className="panel-surface min-h-0 flex-1 overflow-y-auto p-6">
+        <section className="panel-surface min-h-0 flex-1 overflow-y-auto p-4">
           {selectedServer ? (
             editMode ? (
               <McpServerEditor
@@ -860,7 +860,7 @@ function AddMcpServerModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            className="panel-surface w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-lg max-h-[85vh] overflow-y-auto p-4 shadow-[var(--shadow-lg)]"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -1058,7 +1058,7 @@ function ConfirmDeleteModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            className="panel-surface w-full max-w-md p-5 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-md p-4 shadow-[var(--shadow-lg)]"
             role="alertdialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
@@ -1257,7 +1257,7 @@ function FormField({
 function EmptyDetail({ loading }: { loading: boolean }) {
   const { t } = useTranslation()
   return (
-    <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-6 text-center">
+    <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]/30 px-4 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)]">
         <Blocks className="h-6 w-6 text-[var(--color-accent)]" />
       </div>

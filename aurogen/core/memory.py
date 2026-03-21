@@ -145,6 +145,8 @@ Return tool arguments only via save_memory."""
             )
 
             print(f"[Memory] LLM response received")
+            if summary := response.cache_summary():
+                print(f"[Memory][Cache] {summary}")
 
             # 提取 tool_calls（AdapterResponse 已标准化）
             tool_calls = response.tool_calls

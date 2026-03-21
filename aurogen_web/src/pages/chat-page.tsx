@@ -736,7 +736,7 @@ export function ChatPage() {
   return (
     <section className="flex h-full min-h-0 overflow-hidden flex-col gap-4">
       {error ? (
-        <div className="panel-surface shrink-0 flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-5 py-4 text-sm text-[var(--color-danger)]">
+        <div className="panel-surface shrink-0 flex items-start gap-3 border-[color:var(--color-danger)]/30 bg-[color:var(--color-danger)]/10 px-4 py-3 text-sm text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">{t('chat.currentIssue')}</p>
@@ -745,8 +745,8 @@ export function ChatPage() {
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col p-4">
+      <div className="grid min-h-0 flex-1 gap-2 overflow-hidden grid-cols-[280px_minmax(0,1fr)_320px]">
+        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col py-4 px-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('chat.sessions')}</h2>
@@ -778,7 +778,7 @@ export function ChatPage() {
             className="mb-4 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-hover)] px-4 py-2 text-[13px] text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-border-strong)] focus:shadow-[var(--shadow-focus)]"
           />
 
-          <div className="scroll-area min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          <div className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto">
             {loadingSessions ? (
               <SidebarSkeleton />
             ) : filteredSessions.length > 0 ? (
@@ -849,7 +849,7 @@ export function ChatPage() {
         </aside>
 
         <section className="panel-surface flex min-h-0 overflow-hidden flex-col">
-          <div className="shrink-0 border-b border-[var(--color-border-subtle)] px-5 py-4">
+          <div className="shrink-0 border-b border-[var(--color-border-subtle)] px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('chat.conversation')}</h2>
@@ -863,7 +863,7 @@ export function ChatPage() {
 
           <div
             ref={conversationScrollRef}
-            className="scroll-area min-h-0 flex-1 overflow-y-auto px-5 py-5"
+            className="scroll-area min-h-0 flex-1 overflow-y-auto px-4 py-4"
           >
             <div className="flex min-h-full flex-col gap-4">
               {loadingConversation ? (
@@ -879,7 +879,7 @@ export function ChatPage() {
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-[var(--color-border-subtle)] px-5 py-4">
+          <div className="shrink-0 border-t border-[var(--color-border-subtle)] px-4 py-3">
             <form
               className="space-y-3"
               onSubmit={(event) => {
@@ -926,7 +926,7 @@ export function ChatPage() {
           </div>
         </section>
 
-        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col p-5">
+        <aside className="panel-surface flex min-h-0 overflow-hidden flex-col py-4 px-3">
           <div className="mb-5">
             <h2 className="text-[13px] font-semibold text-[var(--color-text-primary)]">{t('chat.sessionDetails')}</h2>
             <p className="mt-1 text-[11px] tertiary-text">{t('chat.sessionDetailsHint')}</p>
@@ -1215,7 +1215,7 @@ function ConfirmDeleteModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            className="panel-surface w-full max-w-md p-5 shadow-[var(--shadow-lg)]"
+            className="panel-surface w-full max-w-md p-4 shadow-[var(--shadow-lg)]"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="delete-session-title"

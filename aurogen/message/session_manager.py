@@ -24,11 +24,11 @@ class ContextBuilder:
         self.agent_workspace = workspace / "agents" / agent_name
         self.skills_loader = SkillsLoader(workspace=self.agent_workspace)
 
-    def build_system_prompt(self) -> str:
+    def build_system_prompt(self, history: list[dict[str, Any]] | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, and memory."""
         parts = [self._get_identity()]
 
-        bootstrap = self._load_bootstrap_prompt()
+        bootstrap = self._load_bootstrap_prompt(history=history or [])
         if bootstrap:
             parts.append(bootstrap)
 
@@ -76,14 +76,28 @@ Your workspace is at: {workspace_path}
             return memory_file.read_text(encoding="utf-8")
         return ""
 
-    def _load_bootstrap_prompt(self) -> str:
+    def _load_bootstrap_prompt(self, history: list[dict[str, Any]]) -> str:
         """Load BOOTSTRAP.md only while bootstrap is incomplete."""
         if config_manager.get(f"agents.{self.agent_name}.bootstrap_completed", False):
             return ""
 
         file_path = self.agent_workspace / "BOOTSTRAP.md"
         if file_path.exists():
-            return file_path.read_text(encoding="utf-8")
+            content = file_path.read_text(encoding="utf-8")
+            assistant_turns = sum(1 for msg in history if msg.get("role") == "assistant")
+            current_turn = assistant_turns + 1
+            remaining = max(0, 3 - current_turn)
+            deadline = f"""
+
+## Bootstrap Deadline
+
+- Current bootstrap assistant reply: {current_turn} of 3
+- Remaining assistant replies before forced completion: {remaining}
+- Ask at most one compact question in this reply.
+- If you already have enough information, write `soul` and `user` now and call `memory(action=\"complete_bootstrap\")`.
+- If this is reply 3, do not ask more questions. Finish bootstrap in this reply using best-effort defaults if needed.
+"""
+            return content + deadline
         return ""
 
     def _load_prompt_files(self) -> str:
@@ -102,9 +116,11 @@ Your workspace is at: {workspace_path}
     @staticmethod
     def build_runtime_context(channel: str | None, chat_id: str | None) -> str:
         """Build untrusted runtime metadata block for injection before the user message."""
-        now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
-        tz = time.strftime("%Z") or "UTC"
-        lines = [f"Current Time: {now} ({tz})"]
+        lines = []
+        if config_manager.get("runtime.include_current_time_in_context", False):
+            now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
+            tz = time.strftime("%Z") or "UTC"
+            lines.append(f"Current Time: {now} ({tz})")
         if channel and chat_id:
             lines += [f"Channel: {channel}", f"Chat ID: {chat_id}"]
         return ContextBuilder._RUNTIME_CONTEXT_TAG + "\n" + "\n".join(lines)
@@ -118,7 +134,7 @@ Your workspace is at: {workspace_path}
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
         messages = [
-            {"role": "system", "content": self.build_system_prompt()},
+            {"role": "system", "content": self.build_system_prompt(history=history)},
             *history,
         ]
         

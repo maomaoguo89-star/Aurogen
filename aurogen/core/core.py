@@ -516,7 +516,10 @@ class AgentLoop:
             return AdapterResponse(content="（未配置 provider）")
 
         # OpenAI SDK 是同步的，用 to_thread 包装成异步
-        return await asyncio.to_thread(self.provider.response, messages, tools=tools, agent_name=agent_name)
+        response = await asyncio.to_thread(self.provider.response, messages, tools=tools, agent_name=agent_name)
+        if summary := response.cache_summary():
+            print(f"[LLM][Cache] {summary}")
+        return response
 
     def _parse_tool_arguments(self, raw_args: Any) -> dict[str, Any]:
         """兼容字符串或对象形式的工具参数。"""
